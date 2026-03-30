@@ -247,8 +247,41 @@ fragment float4 oceanFragment(VertexOut in [[stage_in]],
 
 // ---- Wireframe ----
 
+constant float WIREFRAME_Y_OFFSET = 0.5;
+
+vertex VertexOut wireframeVertex(VertexIn in [[stage_in]],
+                                  constant SceneUniforms&   uniforms [[buffer(1)]],
+                                  constant SurfaceUniforms& surface  [[buffer(2)]],
+                                  texture2d<float> gustNoiseTex [[texture(0)]],
+                                  sampler repeatSampler [[sampler(0)]]) {
+    float2 gustUV = calcScrollUV(in.position, surface.gustDirection,
+                                  float2(-60.0), surface.gustSpeed, surface.gustScale, uniforms.time);
+    float2 normalUV = calcScrollUV(in.position, surface.normalMappingDirection,
+                                    float2(-60.0), surface.normalMappingSpeed,
+                                    surface.normalMappingScale, uniforms.time);
+
+    float3 newPosition = calcNewPosition(in.position, uniforms);
+    float gustSample = gustNoiseTex.sample(repeatSampler, gustUV).r;
+    newPosition.y += (gustSample - 0.5) * 2.0 * surface.gustStrength;
+    newPosition.y -= WIREFRAME_Y_OFFSET;   // ride below the ocean surface
+
+    float3 tangent, bitangent;
+    float3 normal = calcNormal(in.position, newPosition, NORMAL_OFFSET, uniforms, tangent, bitangent);
+
+    float4x4 mvp = uniforms.projectionMatrix * uniforms.viewMatrix * uniforms.modelMatrix;
+    VertexOut out;
+    out.position  = mvp * float4(newPosition, 1.0);
+    out.fragPos   = newPosition;
+    out.normal    = normalize(normal);
+    out.tangent   = tangent;
+    out.bitangent = bitangent;
+    out.fragUV    = normalUV;
+    out.color     = surface.baseColor.rgb;
+    return out;
+}
+
 fragment float4 wireframeFragment(VertexOut in [[stage_in]]) {
-    return float4(0.0, 0.5, 0.5, 1.0); // teal, matches web/native wireframe_shader color
+    return float4(0.0, 0.5, 0.5, 1.0);
 }
 
 // ---- Skybox ----

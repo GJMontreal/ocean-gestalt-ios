@@ -16,6 +16,7 @@ final class OceanRenderer: NSObject, MTKViewDelegate {
     // Depth states
     private let depthState: MTLDepthStencilState
     private let skyboxDepthState: MTLDepthStencilState   // lessEqual, no write
+    private let wireframeDepthState: MTLDepthStencilState // always, no write
 
     // Meshes
     private let oceanMesh: MeshBuffers
@@ -110,9 +111,9 @@ final class OceanRenderer: NSObject, MTKViewDelegate {
         guard let op = try? device.makeRenderPipelineState(descriptor: oceanDesc) else { return nil }
         oceanPipeline = op
 
-        // ---- Wireframe pipeline (same vertex shader, flat colour fragment) ----
+        // ---- Wireframe pipeline ----
         let wireDesc = MTLRenderPipelineDescriptor()
-        wireDesc.vertexFunction   = library.makeFunction(name: "oceanVertex")
+        wireDesc.vertexFunction   = library.makeFunction(name: "wireframeVertex")
         wireDesc.fragmentFunction = library.makeFunction(name: "wireframeFragment")
         wireDesc.vertexDescriptor = oceanVertDesc
         wireDesc.colorAttachments[0].pixelFormat = mtkView.colorPixelFormat
@@ -160,6 +161,12 @@ final class OceanRenderer: NSObject, MTKViewDelegate {
         skyboxDepthDesc.isDepthWriteEnabled  = false
         guard let sds = device.makeDepthStencilState(descriptor: skyboxDepthDesc) else { return nil }
         skyboxDepthState = sds
+
+        let wireframeDepthDesc = MTLDepthStencilDescriptor()
+        wireframeDepthDesc.depthCompareFunction = .always
+        wireframeDepthDesc.isDepthWriteEnabled  = false
+        guard let wds = device.makeDepthStencilState(descriptor: wireframeDepthDesc) else { return nil }
+        wireframeDepthState = wds
 
         super.init()
 
@@ -354,20 +361,6 @@ final class OceanRenderer: NSObject, MTKViewDelegate {
             return
         }
 
-        // Wireframe (drawn first so ocean depth occludes lines that are behind waves)
-        enc.setRenderPipelineState(wireframePipeline)
-        enc.setDepthStencilState(depthState)
-        enc.setVertexBuffer(oceanMesh.vertexBuffer, offset: 0, index: 0)
-        enc.setVertexBytes(&sceneMain,       length: MemoryLayout<SceneUniforms>.size,   index: 1)
-        enc.setVertexBytes(&surfaceUniforms,  length: MemoryLayout<SurfaceUniforms>.size, index: 2)
-        enc.setVertexTexture(gustNoiseTex, index: 0)
-        enc.setVertexSamplerState(repeatSampler, index: 0)
-        enc.setDepthBias(-1.0, slopeScale: -1.0, clamp: 0)
-        enc.drawIndexedPrimitives(type: .line, indexCount: wirelineCount,
-                                  indexType: .uint32, indexBuffer: wirelineBuffer,
-                                  indexBufferOffset: 0)
-        enc.setDepthBias(0, slopeScale: 0, clamp: 0)
-
         // Ocean — explicitly set all fragment texture slots
         enc.setRenderPipelineState(oceanPipeline)
         enc.setDepthStencilState(depthState)
@@ -387,8 +380,22 @@ final class OceanRenderer: NSObject, MTKViewDelegate {
                                   indexType: .uint32, indexBuffer: oceanMesh.indexBuffer,
                                   indexBufferOffset: 0)
 
-        // Buoy
+        // Wireframe — drawn after ocean with depthCompare=always so it shows through
+        // the surface; Y is offset below the displaced geometry so peaks ride above it
+        enc.setRenderPipelineState(wireframePipeline)
+        enc.setDepthStencilState(wireframeDepthState)
+        enc.setVertexBuffer(oceanMesh.vertexBuffer, offset: 0, index: 0)
+        enc.setVertexBytes(&sceneMain,      length: MemoryLayout<SceneUniforms>.size,   index: 1)
+        enc.setVertexBytes(&surfaceUniforms, length: MemoryLayout<SurfaceUniforms>.size, index: 2)
+        enc.setVertexTexture(gustNoiseTex, index: 0)
+        enc.setVertexSamplerState(repeatSampler, index: 0)
+        enc.drawIndexedPrimitives(type: .line, indexCount: wirelineCount,
+                                  indexType: .uint32, indexBuffer: wirelineBuffer,
+                                  indexBufferOffset: 0)
+
+        // Buoy — drawn after wireframe so it appears correctly on top
         enc.setRenderPipelineState(buoyPipeline)
+        enc.setDepthStencilState(depthState)
         enc.setVertexBuffer(buoyMesh.vertexBuffer, offset: 0, index: 0)
         enc.setVertexBytes(&sceneMain,    length: MemoryLayout<SceneUniforms>.size,  index: 1)
         enc.setVertexBytes(&buoyModel,    length: MemoryLayout<simd_float4x4>.size,  index: 2)
