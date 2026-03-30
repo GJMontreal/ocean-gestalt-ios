@@ -152,22 +152,25 @@ final class OceanRenderer: NSObject, MTKViewDelegate {
 
     // MARK: - Texture loading
 
-    private func loadTextures() {
-        let loader = MTKTextureLoader(device: device)
-        let opts2D: [MTKTextureLoader.Option: Any] = [
+    private func load2D(loader: MTKTextureLoader, resource: String, ext: String) -> MTLTexture? {
+        guard let url = Bundle.main.url(forResource: resource, withExtension: ext) else { return nil }
+        let opts: [MTKTextureLoader.Option: Any] = [
             .generateMipmaps: true,
             .SRGB: false,
             .textureUsage: MTLTextureUsage.shaderRead.rawValue
         ]
+        return try? loader.newTexture(URL: url, options: opts)
+    }
 
-        normalMapTex   = try? loader.newTexture(name: "fbm_normalmap",   scaleFactor: 1.0, bundle: nil, options: opts2D)
-        gustNoiseTex   = try? loader.newTexture(name: "gust_noise_512",  scaleFactor: 1.0, bundle: nil, options: opts2D)
-        buoyColorTex   = try? loader.newTexture(name: "metal_color",     scaleFactor: 1.0, bundle: nil, options: opts2D)
-        buoyNormalTex  = try? loader.newTexture(name: "metal_normal",    scaleFactor: 1.0, bundle: nil, options: opts2D)
-        buoyBumpTex    = try? loader.newTexture(name: "metal_bump",      scaleFactor: 1.0, bundle: nil, options: opts2D)
-        buoyRoughnessTex = try? loader.newTexture(name: "metal_bump",    scaleFactor: 1.0, bundle: nil, options: opts2D)
-
-        envMapTex = loadCubemap(loader: loader)
+    private func loadTextures() {
+        let loader = MTKTextureLoader(device: device)
+        normalMapTex     = load2D(loader: loader, resource: "fbm_normalmap",  ext: "png")
+        gustNoiseTex     = load2D(loader: loader, resource: "gust_noise_512", ext: "png")
+        buoyColorTex     = load2D(loader: loader, resource: "metal_color",    ext: "png")
+        buoyNormalTex    = load2D(loader: loader, resource: "metal_normal",   ext: "png")
+        buoyBumpTex      = load2D(loader: loader, resource: "metal_bump",     ext: "png")
+        buoyRoughnessTex = load2D(loader: loader, resource: "metal_bump",     ext: "png")
+        envMapTex        = loadCubemap(loader: loader)
     }
 
     private func loadCubemap(loader: MTKTextureLoader) -> MTLTexture? {
@@ -319,11 +322,11 @@ final class OceanRenderer: NSObject, MTKViewDelegate {
                 enc.setVertexBuffer(oceanMesh.vertexBuffer, offset: 0, index: 0)
                 enc.setVertexBytes(&sceneRefl,      length: MemoryLayout<SceneUniforms>.size,  index: 1)
                 enc.setVertexBytes(&surfaceUniforms, length: MemoryLayout<SurfaceUniforms>.size, index: 2)
-                if let t = gustNoiseTex { enc.setVertexTexture(t, index: 0) }
+                enc.setVertexTexture(gustNoiseTex, index: 0)
                 enc.setVertexSamplerState(repeatSampler, index: 0)
-                if let t = normalMapTex   { enc.setFragmentTexture(t, index: 0) }
-                if let t = envMapTex      { enc.setFragmentTexture(t, index: 1) }
-                enc.setFragmentTexture(reflColor, index: 2)   // self-reference is fine (stale frame)
+                enc.setFragmentTexture(normalMapTex, index: 0)
+                enc.setFragmentTexture(envMapTex,    index: 1)
+                enc.setFragmentTexture(reflColor,    index: 2)
                 enc.setFragmentBytes(&sceneRefl,      length: MemoryLayout<SceneUniforms>.size,  index: 1)
                 enc.setFragmentBytes(&surfaceUniforms, length: MemoryLayout<SurfaceUniforms>.size, index: 2)
                 enc.setFragmentSamplerState(repeatSampler, index: 0)
@@ -351,17 +354,17 @@ final class OceanRenderer: NSObject, MTKViewDelegate {
         enc.setFragmentSamplerState(repeatSampler, index: 0)
         enc.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 36)
 
-        // Ocean
+        // Ocean — explicitly set all fragment texture slots to clear stale skybox bindings
         enc.setRenderPipelineState(oceanPipeline)
         enc.setDepthStencilState(depthState)
         enc.setVertexBuffer(oceanMesh.vertexBuffer, offset: 0, index: 0)
         enc.setVertexBytes(&sceneMain,      length: MemoryLayout<SceneUniforms>.size,  index: 1)
         enc.setVertexBytes(&surfaceUniforms, length: MemoryLayout<SurfaceUniforms>.size, index: 2)
-        if let t = gustNoiseTex { enc.setVertexTexture(t, index: 0) }
+        enc.setVertexTexture(gustNoiseTex, index: 0)
         enc.setVertexSamplerState(repeatSampler, index: 0)
-        if let t = normalMapTex        { enc.setFragmentTexture(t, index: 0) }
-        if let t = envMapTex           { enc.setFragmentTexture(t, index: 1) }
-        if let t = reflectionColorTex  { enc.setFragmentTexture(t, index: 2) }
+        enc.setFragmentTexture(normalMapTex,       index: 0)
+        enc.setFragmentTexture(envMapTex,           index: 1)
+        enc.setFragmentTexture(reflectionColorTex,  index: 2)
         enc.setFragmentBytes(&sceneMain,      length: MemoryLayout<SceneUniforms>.size,  index: 1)
         enc.setFragmentBytes(&surfaceUniforms, length: MemoryLayout<SurfaceUniforms>.size, index: 2)
         enc.setFragmentSamplerState(repeatSampler, index: 0)
