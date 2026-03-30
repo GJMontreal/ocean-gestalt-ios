@@ -1,0 +1,41 @@
+name: OceanGestalt
+options:
+  bundleIdPrefix: ca.geoffreyjones
+  deploymentTarget:
+    iOS: "17.0"
+  defaultConfig: Debug
+
+settings:
+  base:
+    SWIFT_VERSION: 5.9
+    IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+    TARGETED_DEVICE_FAMILY: "1"  # iPhone only
+    SWIFT_STRICT_CONCURRENCY: complete
+
+targets:
+  OceanGestalt:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: OceanGestalt
+        excludes:
+          - "**/*.md"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ca.geoffreyjones.OceanGestalt
+        INFOPLIST_FILE: OceanGestalt/Info.plist
+        SWIFT_OBJC_BRIDGING_HEADER: OceanGestalt/Renderer/ShaderTypes.h
+        MTL_ENABLE_DEBUG_INFO: INCLUDE_SOURCE
+        SUPPORTED_PLATFORMS: iphonesimulator iphoneos
+        SUPPORTS_MACCATALYST: "NO"
+    info:
+      path: OceanGestalt/Info.plist
+      properties:
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UIStatusBarHidden: true
+        UIRequiresFullScreen: true

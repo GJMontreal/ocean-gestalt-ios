@@ -1,0 +1,377 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		02413C23392C2684B5822F17 /* UniformAnimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 239FCFE9BF98A2A52D87EC7E /* UniformAnimator.swift */; };
+		4EBBAB1F75ED76E0D7D9324B /* MeshBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72ABB314BFCE8B82064F81A6 /* MeshBuilder.swift */; };
+		6D40FDD716D37E303AC2D967 /* OceanGestaltApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFE7E23880BD9624018D0679 /* OceanGestaltApp.swift */; };
+		73500114766BA5157981C775 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F88DF9B07DBD14FC7DDD776 /* ContentView.swift */; };
+		846FCDF131AA7F1097136B13 /* OceanRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CF9EA5CA1C3F0F92D3CFF61 /* OceanRenderer.swift */; };
+		9D1F7771B9C522E003ADA5CB /* UniformState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C7D5C89E0C0351E44299EBD /* UniformState.swift */; };
+		D8616F95125FCDFD6B751CF0 /* uniforms.json in Resources */ = {isa = PBXBuildFile; fileRef = EA7085A066A52E0ADACB6B20 /* uniforms.json */; };
+		E4CD5D05AFF8E423535E1F5F /* OceanShaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = 8E793CD7019DB6D9F820199C /* OceanShaders.metal */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		239FCFE9BF98A2A52D87EC7E /* UniformAnimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UniformAnimator.swift; sourceTree = "<group>"; };
+		579C3786E2E1B2857B29D3BE /* ShaderTypes.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ShaderTypes.h; sourceTree = "<group>"; };
+		72ABB314BFCE8B82064F81A6 /* MeshBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeshBuilder.swift; sourceTree = "<group>"; };
+		7CF9EA5CA1C3F0F92D3CFF61 /* OceanRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OceanRenderer.swift; sourceTree = "<group>"; };
+		8E793CD7019DB6D9F820199C /* OceanShaders.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = OceanShaders.metal; sourceTree = "<group>"; };
+		9C7D5C89E0C0351E44299EBD /* UniformState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UniformState.swift; sourceTree = "<group>"; };
+		9F88DF9B07DBD14FC7DDD776 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		A99973264D1E54236EA96B39 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		BE84600A5B183A5AF87D5652 /* OceanGestalt.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = OceanGestalt.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		EA7085A066A52E0ADACB6B20 /* uniforms.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = uniforms.json; sourceTree = "<group>"; };
+		FFE7E23880BD9624018D0679 /* OceanGestaltApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OceanGestaltApp.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		220B0795504FDF6809A6A2AD /* OceanGestalt */ = {
+			isa = PBXGroup;
+			children = (
+				A99973264D1E54236EA96B39 /* Info.plist */,
+				FC2A3B3E098DD7B4F410ADC3 /* App */,
+				CEC786A7F2C0AB6FE09F3C0E /* Model */,
+				6E71D23ED57CE8DA028FD227 /* Renderer */,
+				8C34D42492A327F8B718BFF3 /* Resources */,
+				E7ED286FC9BC2DBF3A86F29E /* Shaders */,
+			);
+			path = OceanGestalt;
+			sourceTree = "<group>";
+		};
+		6E71D23ED57CE8DA028FD227 /* Renderer */ = {
+			isa = PBXGroup;
+			children = (
+				72ABB314BFCE8B82064F81A6 /* MeshBuilder.swift */,
+				7CF9EA5CA1C3F0F92D3CFF61 /* OceanRenderer.swift */,
+				579C3786E2E1B2857B29D3BE /* ShaderTypes.h */,
+			);
+			path = Renderer;
+			sourceTree = "<group>";
+		};
+		8C34D42492A327F8B718BFF3 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				EA7085A066A52E0ADACB6B20 /* uniforms.json */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		CEC786A7F2C0AB6FE09F3C0E /* Model */ = {
+			isa = PBXGroup;
+			children = (
+				239FCFE9BF98A2A52D87EC7E /* UniformAnimator.swift */,
+				9C7D5C89E0C0351E44299EBD /* UniformState.swift */,
+			);
+			path = Model;
+			sourceTree = "<group>";
+		};
+		DE23F859E548783FE93829A9 = {
+			isa = PBXGroup;
+			children = (
+				220B0795504FDF6809A6A2AD /* OceanGestalt */,
+				F99D6A57A91A6F2301673805 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		E7ED286FC9BC2DBF3A86F29E /* Shaders */ = {
+			isa = PBXGroup;
+			children = (
+				8E793CD7019DB6D9F820199C /* OceanShaders.metal */,
+			);
+			path = Shaders;
+			sourceTree = "<group>";
+		};
+		F99D6A57A91A6F2301673805 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				BE84600A5B183A5AF87D5652 /* OceanGestalt.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		FC2A3B3E098DD7B4F410ADC3 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				9F88DF9B07DBD14FC7DDD776 /* ContentView.swift */,
+				FFE7E23880BD9624018D0679 /* OceanGestaltApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		F9137A454D1B6BE912AD548E /* OceanGestalt */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C2E791C05347CC8213F9E120 /* Build configuration list for PBXNativeTarget "OceanGestalt" */;
+			buildPhases = (
+				C8C074BD96CDA1C1DFC74565 /* Sources */,
+				A6E5F645C6E859F01944A48C /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = OceanGestalt;
+			packageProductDependencies = (
+			);
+			productName = OceanGestalt;
+			productReference = BE84600A5B183A5AF87D5652 /* OceanGestalt.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		2C5982713556565E9F5C6C2C /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+				};
+			};
+			buildConfigurationList = 3BE3E2D65468E9D81B938F61 /* Build configuration list for PBXProject "OceanGestalt" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = DE23F859E548783FE93829A9;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = F99D6A57A91A6F2301673805 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				F9137A454D1B6BE912AD548E /* OceanGestalt */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A6E5F645C6E859F01944A48C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D8616F95125FCDFD6B751CF0 /* uniforms.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		C8C074BD96CDA1C1DFC74565 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				73500114766BA5157981C775 /* ContentView.swift in Sources */,
+				4EBBAB1F75ED76E0D7D9324B /* MeshBuilder.swift in Sources */,
+				6D40FDD716D37E303AC2D967 /* OceanGestaltApp.swift in Sources */,
+				846FCDF131AA7F1097136B13 /* OceanRenderer.swift in Sources */,
+				E4CD5D05AFF8E423535E1F5F /* OceanShaders.metal in Sources */,
+				02413C23392C2684B5822F17 /* UniformAnimator.swift in Sources */,
+				9D1F7771B9C522E003ADA5CB /* UniformState.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		1A124B7C7F34E782338980B6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = OceanGestalt/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				PRODUCT_BUNDLE_IDENTIFIER = ca.geoffreyjones.OceanGestalt;
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphonesimulator iphoneos";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_OBJC_BRIDGING_HEADER = OceanGestalt/Renderer/ShaderTypes.h;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		3DE558D59F24C7FD1CC9F572 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		490CC69FBD915CA912374F8A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = OceanGestalt/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				PRODUCT_BUNDLE_IDENTIFIER = ca.geoffreyjones.OceanGestalt;
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphonesimulator iphoneos";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_OBJC_BRIDGING_HEADER = OceanGestalt/Renderer/ShaderTypes.h;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		C0D75E40F76BB8B15B5C763A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		3BE3E2D65468E9D81B938F61 /* Build configuration list for PBXProject "OceanGestalt" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C0D75E40F76BB8B15B5C763A /* Debug */,
+				3DE558D59F24C7FD1CC9F572 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		C2E791C05347CC8213F9E120 /* Build configuration list for PBXNativeTarget "OceanGestalt" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				490CC69FBD915CA912374F8A /* Debug */,
+				1A124B7C7F34E782338980B6 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 2C5982713556565E9F5C6C2C /* Project object */;
+}
