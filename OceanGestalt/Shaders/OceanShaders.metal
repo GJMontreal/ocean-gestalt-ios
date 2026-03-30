@@ -245,6 +245,12 @@ fragment float4 oceanFragment(VertexOut in [[stage_in]],
     return float4(finalColor, 1.0);
 }
 
+// ---- Wireframe ----
+
+fragment float4 wireframeFragment(VertexOut in [[stage_in]]) {
+    return float4(0.0, 0.5, 0.5, 1.0); // teal, matches web/native wireframe_shader color
+}
+
 // ---- Skybox ----
 
 constant float3 skyboxPositions[36] = {

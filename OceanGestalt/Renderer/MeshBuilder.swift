@@ -18,6 +18,31 @@ struct BuoyVertex {
 }
 
 enum MeshBuilder {
+    /// Returns (indexBuffer, lineCount) reusing the same vertex buffer as buildGrid.
+    static func buildGridLines(device: MTLDevice, resolution: Int = 200) -> (MTLBuffer, Int)? {
+        var indices = [UInt32]()
+        indices.reserveCapacity(4 * resolution * (resolution + 1))
+        // Horizontal edges
+        for z in 0...resolution {
+            for x in 0..<resolution {
+                indices.append(UInt32(z * (resolution + 1) + x))
+                indices.append(UInt32(z * (resolution + 1) + x + 1))
+            }
+        }
+        // Vertical edges
+        for x in 0...resolution {
+            for z in 0..<resolution {
+                indices.append(UInt32(z * (resolution + 1) + x))
+                indices.append(UInt32((z + 1) * (resolution + 1) + x))
+            }
+        }
+        guard let ib = device.makeBuffer(bytes: indices,
+                                          length: indices.count * MemoryLayout<UInt32>.stride,
+                                          options: .storageModeShared)
+        else { return nil }
+        return (ib, indices.count)
+    }
+
     static func buildSphere(device: MTLDevice, rings: Int = 24, sectors: Int = 24) -> MeshBuffers? {
         var vertices: [BuoyVertex] = []
         var indices: [UInt32] = []

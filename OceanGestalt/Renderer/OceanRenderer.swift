@@ -9,6 +9,7 @@ final class OceanRenderer: NSObject, MTKViewDelegate {
 
     // Pipelines
     private let oceanPipeline: MTLRenderPipelineState
+    private let wireframePipeline: MTLRenderPipelineState
     private let skyboxPipeline: MTLRenderPipelineState
     private let buoyPipeline: MTLRenderPipelineState
 
@@ -19,6 +20,8 @@ final class OceanRenderer: NSObject, MTKViewDelegate {
     // Meshes
     private let oceanMesh: MeshBuffers
     private let buoyMesh: MeshBuffers
+    private let wirelineBuffer: MTLBuffer
+    private let wirelineCount: Int
 
     // Textures
     private var normalMapTex: MTLTexture?
@@ -60,10 +63,13 @@ final class OceanRenderer: NSObject, MTKViewDelegate {
         self.uniformState = UniformState()
 
         guard let oceanMesh = MeshBuilder.buildGrid(device: device),
-              let buoyMesh  = MeshBuilder.buildSphere(device: device)
+              let buoyMesh  = MeshBuilder.buildSphere(device: device),
+              let (wlBuf, wlCount) = MeshBuilder.buildGridLines(device: device)
         else { return nil }
-        self.oceanMesh = oceanMesh
-        self.buoyMesh  = buoyMesh
+        self.oceanMesh      = oceanMesh
+        self.buoyMesh       = buoyMesh
+        self.wirelineBuffer = wlBuf
+        self.wirelineCount  = wlCount
 
         // Samplers
         let repDesc = MTLSamplerDescriptor()
@@ -103,6 +109,16 @@ final class OceanRenderer: NSObject, MTKViewDelegate {
         oceanDesc.depthAttachmentPixelFormat      = mtkView.depthStencilPixelFormat
         guard let op = try? device.makeRenderPipelineState(descriptor: oceanDesc) else { return nil }
         oceanPipeline = op
+
+        // ---- Wireframe pipeline (same vertex shader, flat colour fragment) ----
+        let wireDesc = MTLRenderPipelineDescriptor()
+        wireDesc.vertexFunction   = library.makeFunction(name: "oceanVertex")
+        wireDesc.fragmentFunction = library.makeFunction(name: "wireframeFragment")
+        wireDesc.vertexDescriptor = oceanVertDesc
+        wireDesc.colorAttachments[0].pixelFormat = mtkView.colorPixelFormat
+        wireDesc.depthAttachmentPixelFormat      = mtkView.depthStencilPixelFormat
+        guard let wp = try? device.makeRenderPipelineState(descriptor: wireDesc) else { return nil }
+        wireframePipeline = wp
 
         // ---- Skybox pipeline ----
         let skyboxDesc = MTLRenderPipelineDescriptor()
@@ -308,14 +324,6 @@ final class OceanRenderer: NSObject, MTKViewDelegate {
             reflPassDesc.depthAttachment.clearDepth       = 1.0
 
             if let enc = commandBuffer.makeRenderCommandEncoder(descriptor: reflPassDesc) {
-                // Skybox
-                enc.setRenderPipelineState(skyboxPipeline)
-                enc.setDepthStencilState(skyboxDepthState)
-                enc.setVertexBytes(&sceneRefl, length: MemoryLayout<SceneUniforms>.size, index: 1)
-                if let envMap = envMapTex { enc.setFragmentTexture(envMap, index: 0) }
-                enc.setFragmentSamplerState(repeatSampler, index: 0)
-                enc.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 36)
-
                 // Ocean (clipped at y=0 by shader)
                 enc.setRenderPipelineState(oceanPipeline)
                 enc.setDepthStencilState(depthState)
@@ -346,15 +354,21 @@ final class OceanRenderer: NSObject, MTKViewDelegate {
             return
         }
 
-        // Skybox
-        enc.setRenderPipelineState(skyboxPipeline)
-        enc.setDepthStencilState(skyboxDepthState)
-        enc.setVertexBytes(&sceneMain, length: MemoryLayout<SceneUniforms>.size, index: 1)
-        if let envMap = envMapTex { enc.setFragmentTexture(envMap, index: 0) }
-        enc.setFragmentSamplerState(repeatSampler, index: 0)
-        enc.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 36)
+        // Wireframe (drawn first so ocean depth occludes lines that are behind waves)
+        enc.setRenderPipelineState(wireframePipeline)
+        enc.setDepthStencilState(depthState)
+        enc.setVertexBuffer(oceanMesh.vertexBuffer, offset: 0, index: 0)
+        enc.setVertexBytes(&sceneMain,       length: MemoryLayout<SceneUniforms>.size,   index: 1)
+        enc.setVertexBytes(&surfaceUniforms,  length: MemoryLayout<SurfaceUniforms>.size, index: 2)
+        enc.setVertexTexture(gustNoiseTex, index: 0)
+        enc.setVertexSamplerState(repeatSampler, index: 0)
+        enc.setDepthBias(-1.0, slopeScale: -1.0, clamp: 0)
+        enc.drawIndexedPrimitives(type: .line, indexCount: wirelineCount,
+                                  indexType: .uint32, indexBuffer: wirelineBuffer,
+                                  indexBufferOffset: 0)
+        enc.setDepthBias(0, slopeScale: 0, clamp: 0)
 
-        // Ocean — explicitly set all fragment texture slots to clear stale skybox bindings
+        // Ocean — explicitly set all fragment texture slots
         enc.setRenderPipelineState(oceanPipeline)
         enc.setDepthStencilState(depthState)
         enc.setVertexBuffer(oceanMesh.vertexBuffer, offset: 0, index: 0)
