@@ -111,9 +111,9 @@ final class OceanRenderer: NSObject, MTKViewDelegate {
         guard let op = try? device.makeRenderPipelineState(descriptor: oceanDesc) else { return nil }
         oceanPipeline = op
 
-        // ---- Wireframe pipeline ----
+        // ---- Wireframe pipeline (reuses oceanVertex, flat colour fragment) ----
         let wireDesc = MTLRenderPipelineDescriptor()
-        wireDesc.vertexFunction   = library.makeFunction(name: "wireframeVertex")
+        wireDesc.vertexFunction   = library.makeFunction(name: "oceanVertex")
         wireDesc.fragmentFunction = library.makeFunction(name: "wireframeFragment")
         wireDesc.vertexDescriptor = oceanVertDesc
         wireDesc.colorAttachments[0].pixelFormat = mtkView.colorPixelFormat
@@ -162,8 +162,10 @@ final class OceanRenderer: NSObject, MTKViewDelegate {
         guard let sds = device.makeDepthStencilState(descriptor: skyboxDepthDesc) else { return nil }
         skyboxDepthState = sds
 
+        // Wire: less (normal depth test), no write — depth bias in draw call lets
+        // lines sit just in front of the filled surface they share vertices with
         let wireframeDepthDesc = MTLDepthStencilDescriptor()
-        wireframeDepthDesc.depthCompareFunction = .always
+        wireframeDepthDesc.depthCompareFunction = .less
         wireframeDepthDesc.isDepthWriteEnabled  = false
         guard let wds = device.makeDepthStencilState(descriptor: wireframeDepthDesc) else { return nil }
         wireframeDepthState = wds
@@ -380,8 +382,9 @@ final class OceanRenderer: NSObject, MTKViewDelegate {
                                   indexType: .uint32, indexBuffer: oceanMesh.indexBuffer,
                                   indexBufferOffset: 0)
 
-        // Wireframe — drawn after ocean with depthCompare=always so it shows through
-        // the surface; Y is offset below the displaced geometry so peaks ride above it
+        // Wireframe — same displaced positions as ocean, drawn after so depth buffer
+        // is already written. Negative bias pulls lines just in front of the surface
+        // so they pass the depth test without showing through other objects.
         enc.setRenderPipelineState(wireframePipeline)
         enc.setDepthStencilState(wireframeDepthState)
         enc.setVertexBuffer(oceanMesh.vertexBuffer, offset: 0, index: 0)
@@ -389,9 +392,11 @@ final class OceanRenderer: NSObject, MTKViewDelegate {
         enc.setVertexBytes(&surfaceUniforms, length: MemoryLayout<SurfaceUniforms>.size, index: 2)
         enc.setVertexTexture(gustNoiseTex, index: 0)
         enc.setVertexSamplerState(repeatSampler, index: 0)
+        enc.setDepthBias(-1.0, slopeScale: -1.0, clamp: 0)
         enc.drawIndexedPrimitives(type: .line, indexCount: wirelineCount,
                                   indexType: .uint32, indexBuffer: wirelineBuffer,
                                   indexBufferOffset: 0)
+        enc.setDepthBias(0, slopeScale: 0, clamp: 0)
 
         // Buoy — drawn after wireframe so it appears correctly on top
         enc.setRenderPipelineState(buoyPipeline)

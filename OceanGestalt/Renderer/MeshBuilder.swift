@@ -19,7 +19,7 @@ struct BuoyVertex {
 
 enum MeshBuilder {
     /// Returns (indexBuffer, lineCount) reusing the same vertex buffer as buildGrid.
-    static func buildGridLines(device: MTLDevice, resolution: Int = 200) -> (MTLBuffer, Int)? {
+    static func buildGridLines(device: MTLDevice, resolution: Int = 120) -> (MTLBuffer, Int)? {
         var indices = [UInt32]()
         indices.reserveCapacity(4 * resolution * (resolution + 1))
         // Horizontal edges
@@ -78,7 +78,7 @@ enum MeshBuilder {
         return MeshBuffers(vertexBuffer: vb, indexBuffer: ib, indexCount: indices.count)
     }
 
-    static func buildGrid(device: MTLDevice, size: Float = 200.0, resolution: Int = 200) -> MeshBuffers? {
+    static func buildGrid(device: MTLDevice, size: Float = 60.0, resolution: Int = 120) -> MeshBuffers? {
         let vertexCount = (resolution + 1) * (resolution + 1)
         var vertices = [OceanVertex]()
         vertices.reserveCapacity(vertexCount)
