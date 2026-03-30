@@ -17,31 +17,52 @@ final class UniformState {
     var waves: [WaveState] = []
 
     // Surface
-    var baseColor: SIMD4<Float>     = SIMD4<Float>(0, 0.04, 0.03, 1)
-    var lightPos: SIMD3<Float>      = SIMD3<Float>(50, 80, 30)
-    var fogDensity: Float           = 0.01
-    var fogColor: SIMD3<Float>      = SIMD3<Float>(0.4, 0.6, 0.7)
-    var causticScale: Float         = 2.0
-    var causticSpeed: Float         = 0.3
-    var causticIntensity: Float     = 1.0
-    var causticColor: SIMD3<Float>  = SIMD3<Float>(1, 0.9, 0.7)
-    var causticTroughMin: Float     = -0.6
-    var causticTroughMax: Float     = 0.1
-    var causticThresholdMin: Float  = 0.55
-    var causticThresholdMax: Float  = 0.8
-    var causticSharpness: Float     = 6.0
-    var foamScale: Float            = 0.4
-    var foamScrollSpeed: Float      = 0.001
-    var foamSlopeMin: Float         = 0.71
-    var foamSlopeMax: Float         = 1.97
-    var foamSlopeAmplifier: Float   = 72.68
-    var foamPower: Float            = 0.5
-    var depthFadeNear: Float        = 10.0
-    var depthFadeFar: Float         = 80.0
-    var deepWaterTint: SIMD3<Float> = SIMD3<Float>(0.1, 0.2, 0.3)
-    var fresnelF0: Float            = 0.04
-    var gamma: Float                = 0.45
-    var reflectionDistortion: Float = 0.03
+    var baseColor: SIMD4<Float>         = SIMD4<Float>(0, 0.04, 0.03, 1)
+    var lightPos: SIMD3<Float>          = SIMD3<Float>(50, 80, 30)
+    var fogDensity: Float               = 0.01
+    var fogColor: SIMD3<Float>          = SIMD3<Float>(0.4, 0.6, 0.7)
+    var causticScale: Float             = 2.0
+    var causticSpeed: Float             = 0.3
+    var causticIntensity: Float         = 1.0
+    var causticColor: SIMD3<Float>      = SIMD3<Float>(1, 0.9, 0.7)
+    var causticTroughMin: Float         = -0.6
+    var causticTroughMax: Float         = 0.1
+    var causticThresholdMin: Float      = 0.55
+    var causticThresholdMax: Float      = 0.8
+    var causticSharpness: Float         = 6.0
+    var foamScale: Float                = 0.4
+    var foamScrollSpeed: Float          = 0.001
+    var foamSlopeMin: Float             = 0.71
+    var foamSlopeMax: Float             = 1.97
+    var foamSlopeAmplifier: Float       = 72.68
+    var foamPower: Float                = 0.5
+    var depthFadeNear: Float            = 10.0
+    var depthFadeFar: Float             = 80.0
+    var deepWaterTint: SIMD3<Float>     = SIMD3<Float>(0.1, 0.2, 0.3)
+    var fresnelF0: Float                = 0.04
+    var gamma: Float                    = 0.45
+    var reflectionDistortion: Float     = 0.03
+
+    // Gust
+    var gustDirection: SIMD2<Float>     = SIMD2<Float>(1, 0)
+    var gustSpeed: Float                = 0.008
+    var gustScale: Float                = 0.009
+    var gustStrength: Float             = 0.008
+
+    // Normal mapping
+    var normalMappingScale: Float       = 1.0
+    var normalMappingSpeed: Float       = 0.0
+    var normalMappingDirection: SIMD2<Float> = SIMD2<Float>(1, 1)
+
+    // Buoy
+    var buoyHullDisplacement: Float     = 0.04
+    var buoyWaterlineBias: Float        = 0.15
+    var buoyWaterlineWidth: Float       = 0.5
+    var buoyWaterlineStrength: Float    = 0.45
+    var buoyWaterlineNoise: Float       = 0.8
+    var buoyWetStrength: Float          = 0.5
+    var buoySpecularFactor: Float       = 1.0
+    var buoyBumpFactor: Float           = 0.5
 
     let animator = UniformAnimator()
 
@@ -62,13 +83,17 @@ final class UniformState {
                              model: simd_float4x4,
                              view: simd_float4x4,
                              projection: simd_float4x4,
-                             cameraPos: SIMD3<Float>) -> SceneUniforms {
+                             reflectionMatrix: simd_float4x4,
+                             cameraPos: SIMD3<Float>,
+                             isReflectionPass: Bool = false) -> SceneUniforms {
         var u = SceneUniforms()
-        u.modelMatrix      = model
-        u.viewMatrix       = view
-        u.projectionMatrix = projection
-        u.cameraPos        = cameraPos
-        u.time             = time
+        u.modelMatrix       = model
+        u.viewMatrix        = view
+        u.projectionMatrix  = projection
+        u.reflectionMatrix  = reflectionMatrix
+        u.cameraPos         = cameraPos
+        u.time              = time
+        u.isReflectionPass  = isReflectionPass ? 1 : 0
         let numWaves = min(waves.count, Int(MAX_WAVES))
         u.numWaves = Int32(numWaves)
 
@@ -89,31 +114,52 @@ final class UniformState {
 
     func buildSurfaceUniforms() -> SurfaceUniforms {
         var s = SurfaceUniforms()
-        s.lightPos            = lightPos
-        s.fogDensity          = fogDensity
-        s.fogColor            = fogColor
-        s.causticScale        = causticScale
-        s.causticSpeed        = causticSpeed
-        s.causticIntensity    = causticIntensity
-        s.causticColor        = causticColor
-        s.causticTroughMin    = causticTroughMin
-        s.causticTroughMax    = causticTroughMax
-        s.causticThresholdMin = causticThresholdMin
-        s.causticThresholdMax = causticThresholdMax
-        s.causticSharpness    = causticSharpness
-        s.foamScale           = foamScale
-        s.foamScrollSpeed     = foamScrollSpeed
-        s.foamSlopeMin        = foamSlopeMin
-        s.foamSlopeMax        = foamSlopeMax
-        s.foamSlopeAmplifier  = foamSlopeAmplifier
-        s.foamPower           = foamPower
-        s.depthFadeNear       = depthFadeNear
-        s.depthFadeFar        = depthFadeFar
-        s.deepWaterTint       = deepWaterTint
-        s.fresnelF0           = fresnelF0
-        s.gamma               = gamma
-        s.reflectionDistortion = reflectionDistortion
+        s.gustDirection           = gustDirection
+        s.gustSpeed               = gustSpeed
+        s.gustScale               = gustScale
+        s.gustStrength            = gustStrength
+        s.normalMappingScale      = normalMappingScale
+        s.normalMappingSpeed      = normalMappingSpeed
+        s.normalMappingDirection  = normalMappingDirection
+        s.lightPos                = lightPos
+        s.fogDensity              = fogDensity
+        s.fogColor                = fogColor
+        s.causticScale            = causticScale
+        s.causticSpeed            = causticSpeed
+        s.causticIntensity        = causticIntensity
+        s.causticColor            = causticColor
+        s.causticTroughMin        = causticTroughMin
+        s.causticTroughMax        = causticTroughMax
+        s.causticThresholdMin     = causticThresholdMin
+        s.causticThresholdMax     = causticThresholdMax
+        s.causticSharpness        = causticSharpness
+        s.foamScale               = foamScale
+        s.foamScrollSpeed         = foamScrollSpeed
+        s.foamSlopeMin            = foamSlopeMin
+        s.foamSlopeMax            = foamSlopeMax
+        s.foamSlopeAmplifier      = foamSlopeAmplifier
+        s.foamPower               = foamPower
+        s.depthFadeNear           = depthFadeNear
+        s.depthFadeFar            = depthFadeFar
+        s.deepWaterTint           = deepWaterTint
+        s.fresnelF0               = fresnelF0
+        s.gamma                   = gamma
+        s.reflectionDistortion    = reflectionDistortion
+        s.baseColor               = baseColor
         return s
+    }
+
+    func buildBuoyUniforms() -> BuoyUniforms {
+        var b = BuoyUniforms()
+        b.hullDisplacementAmt = buoyHullDisplacement
+        b.waterlineBias       = buoyWaterlineBias
+        b.waterlineWidth      = buoyWaterlineWidth
+        b.waterlineStrength   = buoyWaterlineStrength
+        b.waterlineNoise      = buoyWaterlineNoise
+        b.wetStrength         = buoyWetStrength
+        b.specularFactor      = buoySpecularFactor
+        b.bumpFactor          = buoyBumpFactor
+        return b
     }
 
     // MARK: - JSON loading
@@ -163,7 +209,6 @@ final class UniformState {
             return
         }
 
-        // Surface uniforms
         switch key {
         case "mesh_shader.baseColor":
             if let arr = float4Value(rawValue) { baseColor = arr }
@@ -215,6 +260,40 @@ final class UniformState {
             if let v = floatValue(rawValue) { gamma = v }
         case "mesh_shader.reflectionDistortion":
             if let v = floatValue(rawValue) { reflectionDistortion = v }
+        case "mesh_shader.gust.direction":
+            if let arr = rawValue as? [Double], arr.count >= 2 {
+                gustDirection = SIMD2<Float>(Float(arr[0]), Float(arr[1]))
+            }
+        case "mesh_shader.gust.speed":
+            if let v = floatValue(rawValue) { gustSpeed = v }
+        case "mesh_shader.gust.scale":
+            if let v = floatValue(rawValue) { gustScale = v }
+        case "mesh_shader.gust.strength":
+            if let v = floatValue(rawValue) { gustStrength = v }
+        case "mesh_shader.normalMapping.scale":
+            if let v = floatValue(rawValue) { normalMappingScale = v }
+        case "mesh_shader.normalMapping.speed":
+            if let v = floatValue(rawValue) { normalMappingSpeed = v }
+        case "mesh_shader.normalMapping.direction":
+            if let arr = rawValue as? [Double], arr.count >= 2 {
+                normalMappingDirection = SIMD2<Float>(Float(arr[0]), Float(arr[1]))
+            }
+        case "buoy_mesh.hullDisplacementAmt":
+            if let v = floatValue(rawValue) { buoyHullDisplacement = v }
+        case "buoy_mesh.waterlineBias":
+            if let v = floatValue(rawValue) { buoyWaterlineBias = v }
+        case "buoy_mesh.waterlineWidth":
+            if let v = floatValue(rawValue) { buoyWaterlineWidth = v }
+        case "buoy_mesh.waterlineStrength":
+            if let v = floatValue(rawValue) { buoyWaterlineStrength = v }
+        case "buoy_mesh.waterlineNoise":
+            if let v = floatValue(rawValue) { buoyWaterlineNoise = v }
+        case "buoy_mesh.wetStrength":
+            if let v = floatValue(rawValue) { buoyWetStrength = v }
+        case "buoy_mesh.specularFactor":
+            if let v = floatValue(rawValue) { buoySpecularFactor = v }
+        case "buoy_mesh.bumpFactor":
+            if let v = floatValue(rawValue) { buoyBumpFactor = v }
         default: break
         }
     }
@@ -222,12 +301,11 @@ final class UniformState {
     // MARK: - Helpers
 
     private func parseWaveKey(_ key: String) -> (Int, String)? {
-        // matches "waves[N].param"
         guard key.hasPrefix("waves[") else { return nil }
         guard let closeBracket = key.firstIndex(of: "]") else { return nil }
         let idxStart = key.index(key.startIndex, offsetBy: 6)
         guard let idx = Int(key[idxStart..<closeBracket]) else { return nil }
-        let afterBracket = key.index(closeBracket, offsetBy: 2) // skip "]."
+        let afterBracket = key.index(closeBracket, offsetBy: 2)
         guard afterBracket < key.endIndex else { return nil }
         return (idx, String(key[afterBracket...]))
     }

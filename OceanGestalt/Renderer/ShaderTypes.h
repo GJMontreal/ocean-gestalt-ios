@@ -17,12 +17,13 @@ typedef struct {
     simd_float4x4 modelMatrix;
     simd_float4x4 viewMatrix;
     simd_float4x4 projectionMatrix;
+    simd_float4x4 reflectionMatrix;
     simd_float3 cameraPos;
     float time;
     int numWaves;
+    int isReflectionPass;
     float _pad0;
     float _pad1;
-    float _pad2;
     WaveUniform waves[MAX_WAVES];
 } SceneUniforms;
 
@@ -69,3 +70,14 @@ typedef struct {
     simd_float3 lightPos;
     simd_float4 baseColor;
 } SurfaceUniforms;
+
+typedef struct {
+    float hullDisplacementAmt;
+    float waterlineBias;
+    float waterlineWidth;
+    float waterlineStrength;
+    float waterlineNoise;
+    float wetStrength;
+    float specularFactor;
+    float bumpFactor;
+} BuoyUniforms;
