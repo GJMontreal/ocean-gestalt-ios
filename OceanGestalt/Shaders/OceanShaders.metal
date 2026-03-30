@@ -182,3 +182,39 @@ fragment float4 oceanFragment(VertexOut in [[stage_in]],
 
     return float4(finalColor, 1.0);
 }
+
+// ---- Buoy shaders ----
+
+struct BuoyVertexIn {
+    float3 position [[attribute(0)]];
+    float3 normal   [[attribute(1)]];
+};
+
+struct BuoyVertexOut {
+    float4 position [[position]];
+    float3 fragPos;
+    float3 normal;
+};
+
+vertex BuoyVertexOut buoyVertex(BuoyVertexIn in [[stage_in]],
+                                constant SceneUniforms& scene     [[buffer(1)]],
+                                constant float4x4&      model     [[buffer(2)]]) {
+    float4 worldPos    = model * float4(in.position, 1.0);
+    float3 worldNormal = normalize((model * float4(in.normal, 0.0)).xyz);
+
+    float4x4 vp = scene.projectionMatrix * scene.viewMatrix;
+    BuoyVertexOut out;
+    out.position = vp * worldPos;
+    out.fragPos  = worldPos.xyz;
+    out.normal   = worldNormal;
+    return out;
+}
+
+fragment float4 buoyFragment(BuoyVertexOut       in      [[stage_in]],
+                              constant SurfaceUniforms& surface [[buffer(2)]]) {
+    float3 normal   = normalize(in.normal);
+    float3 lightDir = normalize(surface.lightPos - in.fragPos);
+    float  diff     = max(dot(normal, lightDir), 0.0);
+    float3 color    = float3(0.85, 0.31, 0.0) * (0.25 + 0.75 * diff);
+    return float4(color, 1.0);
+}

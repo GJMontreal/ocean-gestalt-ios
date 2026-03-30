@@ -12,7 +12,47 @@ struct OceanVertex {
     var texCoord: SIMD2<Float>
 }
 
+struct BuoyVertex {
+    var position: SIMD3<Float>
+    var normal: SIMD3<Float>
+}
+
 enum MeshBuilder {
+    static func buildSphere(device: MTLDevice, rings: Int = 24, sectors: Int = 24) -> MeshBuffers? {
+        var vertices: [BuoyVertex] = []
+        var indices: [UInt32] = []
+
+        for r in 0...rings {
+            let phi = Float.pi * Float(r) / Float(rings)
+            for s in 0...sectors {
+                let theta = 2.0 * Float.pi * Float(s) / Float(sectors)
+                let x = sin(phi) * cos(theta)
+                let y = cos(phi)
+                let z = sin(phi) * sin(theta)
+                let n = SIMD3<Float>(x, y, z)
+                vertices.append(BuoyVertex(position: n, normal: n))
+            }
+        }
+
+        for r in 0..<rings {
+            for s in 0..<sectors {
+                let r0 = UInt32(r * (sectors + 1) + s)
+                let r1 = UInt32((r + 1) * (sectors + 1) + s)
+                indices.append(contentsOf: [r0, r1, r0 + 1, r0 + 1, r1, r1 + 1])
+            }
+        }
+
+        guard let vb = device.makeBuffer(bytes: vertices,
+                                         length: vertices.count * MemoryLayout<BuoyVertex>.stride,
+                                         options: .storageModeShared),
+              let ib = device.makeBuffer(bytes: indices,
+                                         length: indices.count * MemoryLayout<UInt32>.stride,
+                                         options: .storageModeShared)
+        else { return nil }
+
+        return MeshBuffers(vertexBuffer: vb, indexBuffer: ib, indexCount: indices.count)
+    }
+
     static func buildGrid(device: MTLDevice, size: Float = 200.0, resolution: Int = 200) -> MeshBuffers? {
         let vertexCount = (resolution + 1) * (resolution + 1)
         var vertices = [OceanVertex]()

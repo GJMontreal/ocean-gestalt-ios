@@ -7,8 +7,10 @@ final class OceanRenderer: NSObject, MTKViewDelegate {
     private let device: MTLDevice
     private let commandQueue: MTLCommandQueue
     private let pipelineState: MTLRenderPipelineState
+    private let buoyPipelineState: MTLRenderPipelineState
     private let depthStencilState: MTLDepthStencilState
     private let mesh: MeshBuffers
+    private let buoyMesh: MeshBuffers
 
     let uniformState: UniformState
 
@@ -38,7 +40,10 @@ final class OceanRenderer: NSObject, MTKViewDelegate {
         guard let mesh = MeshBuilder.buildGrid(device: device) else { return nil }
         self.mesh = mesh
 
-        // Pipeline
+        guard let buoyMesh = MeshBuilder.buildSphere(device: device) else { return nil }
+        self.buoyMesh = buoyMesh
+
+        // Ocean pipeline
         guard let library = device.makeDefaultLibrary() else { return nil }
         let vertFn = library.makeFunction(name: "oceanVertex")
         let fragFn = library.makeFunction(name: "oceanFragment")
@@ -61,6 +66,29 @@ final class OceanRenderer: NSObject, MTKViewDelegate {
 
         guard let ps = try? device.makeRenderPipelineState(descriptor: pipelineDesc) else { return nil }
         pipelineState = ps
+
+        // Buoy pipeline
+        let buoyVertFn = library.makeFunction(name: "buoyVertex")
+        let buoyFragFn = library.makeFunction(name: "buoyFragment")
+
+        let buoyVertDesc = MTLVertexDescriptor()
+        buoyVertDesc.attributes[0].format = .float3
+        buoyVertDesc.attributes[0].offset = 0
+        buoyVertDesc.attributes[0].bufferIndex = 0
+        buoyVertDesc.attributes[1].format = .float3
+        buoyVertDesc.attributes[1].offset = MemoryLayout<SIMD3<Float>>.stride
+        buoyVertDesc.attributes[1].bufferIndex = 0
+        buoyVertDesc.layouts[0].stride = MemoryLayout<BuoyVertex>.stride
+
+        let buoyPipelineDesc = MTLRenderPipelineDescriptor()
+        buoyPipelineDesc.vertexFunction   = buoyVertFn
+        buoyPipelineDesc.fragmentFunction = buoyFragFn
+        buoyPipelineDesc.vertexDescriptor = buoyVertDesc
+        buoyPipelineDesc.colorAttachments[0].pixelFormat = mtkView.colorPixelFormat
+        buoyPipelineDesc.depthAttachmentPixelFormat      = mtkView.depthStencilPixelFormat
+
+        guard let bps = try? device.makeRenderPipelineState(descriptor: buoyPipelineDesc) else { return nil }
+        buoyPipelineState = bps
 
         let depthDesc = MTLDepthStencilDescriptor()
         depthDesc.depthCompareFunction = .less
@@ -135,11 +163,70 @@ final class OceanRenderer: NSObject, MTKViewDelegate {
             indexBufferOffset: 0
         )
 
+        // Draw buoy
+        var buoyModel = buoyModelMatrix(time: time)
+        var surfaceUniformsCopy = surfaceUniforms
+        encoder.setRenderPipelineState(buoyPipelineState)
+        encoder.setVertexBuffer(buoyMesh.vertexBuffer, offset: 0, index: 0)
+        encoder.setVertexBytes(&sceneUniforms, length: MemoryLayout<SceneUniforms>.size, index: 1)
+        encoder.setVertexBytes(&buoyModel, length: MemoryLayout<simd_float4x4>.size, index: 2)
+        encoder.setFragmentBytes(&surfaceUniformsCopy, length: MemoryLayout<SurfaceUniforms>.size, index: 2)
+        encoder.drawIndexedPrimitives(
+            type: .triangle,
+            indexCount: buoyMesh.indexCount,
+            indexType: .uint32,
+            indexBuffer: buoyMesh.indexBuffer,
+            indexBufferOffset: 0
+        )
+
         encoder.endEncoding()
         if let drawable = view.currentDrawable {
             commandBuffer.present(drawable)
         }
         commandBuffer.commit()
+    }
+
+    // MARK: - Buoy
+
+    private func waveDisplacement(at xz: SIMD2<Float>, time: Float) -> SIMD3<Float> {
+        var offset = SIMD3<Float>(0, 0, 0)
+        for wave in uniformState.waves {
+            let safeWavelength = max(wave.wavelength, 0.01)
+            let k = 2.0 * Float.pi / safeWavelength
+            let w = sqrt(9.81 * k)
+            let d = simd_normalize(wave.direction)
+            let wt = (w * time).truncatingRemainder(dividingBy: 2.0 * Float.pi)
+            let ph = simd_dot(d * k, xz) - wt + wave.phase
+            offset.y += wave.amplitude * cos(ph)
+            let xzOff = -wave.steepness * d * sin(ph) * wave.amplitude
+            offset.x += xzOff.x
+            offset.z += xzOff.y
+        }
+        return SIMD3<Float>(xz.x, 0, xz.y) + offset
+    }
+
+    private func buoyModelMatrix(time: Float) -> simd_float4x4 {
+        let buoyXZ = SIMD2<Float>(0, 0)
+        let eps: Float = 0.1
+        let p0 = waveDisplacement(at: buoyXZ, time: time)
+        let pX = waveDisplacement(at: buoyXZ + SIMD2<Float>(eps, 0), time: time)
+        let pZ = waveDisplacement(at: buoyXZ + SIMD2<Float>(0, eps), time: time)
+
+        let tangent   = pX - p0
+        let bitangent = pZ - p0
+        let up = simd_normalize(simd_cross(bitangent, tangent))
+
+        // Gram-Schmidt: keep tangent perpendicular to up
+        let right   = simd_normalize(tangent - simd_dot(tangent, up) * up)
+        let forward = simd_cross(up, right)
+
+        let scale: Float = 2.0
+        return simd_float4x4(
+            SIMD4<Float>(right.x * scale,   right.y * scale,   right.z * scale,   0),
+            SIMD4<Float>(up.x * scale,      up.y * scale,      up.z * scale,      0),
+            SIMD4<Float>(forward.x * scale, forward.y * scale, forward.z * scale, 0),
+            SIMD4<Float>(p0.x, p0.y, p0.z, 1)
+        )
     }
 
     // MARK: - Matrix helpers
