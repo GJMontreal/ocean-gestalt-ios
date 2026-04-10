@@ -38,6 +38,8 @@ targets:
         SUPPORTS_MACCATALYST: "NO"
     dependencies:
       - package: GestureCamera
+        product: GestureCamera
+      - package: GestureCamera
         product: GestureCameraMetalKit
     info:
       path: OceanGestalt/Info.plist

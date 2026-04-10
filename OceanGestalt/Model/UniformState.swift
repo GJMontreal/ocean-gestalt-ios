@@ -16,6 +16,11 @@ struct WaveState {
 @Observable
 @MainActor
 final class UniformState {
+    // CLAUDE: this is a note for claude
+    // I don't like that unifor. names are hardcoded - I don't believe that's the way we did things in the C++ project
+    // mind you, I suppose we have to rebuild the project if we want to modify a shader anyway
+    // I think I still prefer them being driven by the json, we can make inferences about the types
+    // what do you think?
 
     // MARK: - Waves (10 slots matching MAX_WAVES in ShaderTypes.h)
 
