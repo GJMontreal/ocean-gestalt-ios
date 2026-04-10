@@ -7,17 +7,38 @@ import GestureCameraMetalKit
 
 struct ContentView: View {
     @StateObject private var engine = OceanEngine()
+    @State private var lastDragLocation: CGPoint = .zero
 
     var body: some View {
-        ZStack {
-            if let camera = engine.camera {
+        if let camera = engine.camera {
+            ZStack {
+                // 1 — Metal render surface
                 MetalView(engine: engine)
                     .ignoresSafeArea()
 
+                // 2 — Single-finger drag → camera rotation
+                //     Sits below WASDOverlayView so WASD button touches
+                //     are handled by SwiftUI before reaching this layer.
+                Rectangle()
+                    .fill(.clear)
+                    .contentShape(Rectangle())
+                    .gesture(
+                        DragGesture(minimumDistance: 1)
+                            .onChanged { value in
+                                let dx = Float(value.location.x - lastDragLocation.x)
+                                let dy = Float(value.location.y - lastDragLocation.y)
+                                lastDragLocation = value.location
+                                camera.applyRotationGesture(dx: dx, dy: dy)
+                            }
+                            .onEnded { _ in lastDragLocation = .zero }
+                    )
+                    .ignoresSafeArea()
+
+                // 3 — WASD d-pad + vertical + motion toggle (from GestureCamera)
                 WASDOverlayView(controller: camera)
                     .ignoresSafeArea()
 
-                // Pause / mute buttons in the top-left corner
+                // 4 — Pause / mute
                 VStack {
                     HStack {
                         Button(engine.isRunning ? "Pause" : "Resume") {
@@ -35,8 +56,8 @@ struct ContentView: View {
                     Spacer()
                 }
             }
+            .background(Color.black)
         }
-        .background(Color.black)
     }
 }
 
@@ -104,7 +125,7 @@ final class OceanEngine: ObservableObject {
     }
 }
 
-// MARK: - Metal view
+// MARK: - Metal view (no gesture recognizers — handled in SwiftUI layer above)
 
 struct MetalView: UIViewRepresentable {
     let engine: OceanEngine
@@ -112,40 +133,8 @@ struct MetalView: UIViewRepresentable {
     func makeUIView(context: Context) -> MTKView {
         let view = MTKView(frame: .zero, device: engine.device)
         engine.setup(view: view)
-
-        // Pan → camera rotation (single finger)
-        let pan = UIPanGestureRecognizer(target: context.coordinator,
-                                         action: #selector(Coordinator.handlePan(_:)))
-        pan.maximumNumberOfTouches = 1
-        view.addGestureRecognizer(pan)
         return view
     }
 
     func updateUIView(_ uiView: MTKView, context: Context) {}
-
-    func makeCoordinator() -> Coordinator { Coordinator(engine: engine) }
-
-    @MainActor
-    final class Coordinator: NSObject {
-        private let engine: OceanEngine
-        private var lastTranslation: CGPoint = .zero
-
-        init(engine: OceanEngine) { self.engine = engine }
-
-        @objc func handlePan(_ gesture: UIPanGestureRecognizer) {
-            guard let camera = engine.camera else { return }
-            switch gesture.state {
-            case .began:
-                lastTranslation = .zero
-            case .changed:
-                let t  = gesture.translation(in: gesture.view)
-                let dx = Float(t.x - lastTranslation.x)
-                let dy = Float(t.y - lastTranslation.y)
-                lastTranslation = t
-                camera.applyRotationGesture(dx: dx, dy: dy)
-            default:
-                break
-            }
-        }
-    }
 }
