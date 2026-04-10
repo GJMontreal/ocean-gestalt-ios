@@ -104,3 +104,19 @@ typedef struct {
     simd_float2 normalMappingDir;   //                    offset 200
                                     //                    offset 204 → 208
 } SurfaceUniforms;                  // 208 bytes total
+
+// ---------------------------------------------------------------------------
+// ModelUniforms — per-model state for the GLTF PBR shader
+// ---------------------------------------------------------------------------
+
+typedef struct {
+    simd_float4 wireframeColor;   // .xyz = color           offset  0
+    float waterlineClip;          // 1=above, -1=below, 0=none  offset 16
+    float waterlineBias;          //                        offset 20
+    float waterlineWidth;         //                        offset 24
+    float waterlineStrength;      //                        offset 28
+    float waterlineNoise;         //                        offset 32
+    float wetStrength;            //                        offset 36
+    float specularFactor;         //                        offset 40
+    float bumpFactor;             //                        offset 44
+} ModelUniforms;                  // 48 bytes total
