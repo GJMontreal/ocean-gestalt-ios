@@ -1,0 +1,344 @@
+#include <metal_stdlib>
+using namespace metal;
+
+// ---------------------------------------------------------------------------
+// Shared structs — must match ShaderTypes.h exactly
+// ---------------------------------------------------------------------------
+
+#define MAX_WAVES 10
+
+struct WaveUniform {
+    float2 direction;
+    float  amplitude;
+    float  wavelength;
+    float  steepness;
+    float  phase;
+    float  _pad0;
+    float  _pad1;
+};
+
+struct SceneUniforms {
+    float4x4 modelMatrix;
+    float4x4 viewMatrix;
+    float4x4 projectionMatrix;
+    float4x4 reflectionMatrix;
+    float4x4 lightSpaceMatrix;
+    float4   cameraPos;
+    float4   lightPos;
+    float    time;
+    int      isReflectionPass;
+    int      numWaves;
+    float    _pad0;
+    WaveUniform waves[MAX_WAVES];
+};
+
+struct SurfaceUniforms {
+    float4  baseColor;
+    float4  fogColor;
+    float   fogDensity;
+    float   _padFog0, _padFog1, _padFog2;
+    float4  causticColor;
+    float   causticScale;
+    float   causticSpeed;
+    float   causticIntensity;
+    float   causticTroughMin;
+    float   causticTroughMax;
+    float   causticThresholdMin;
+    float   causticThresholdMax;
+    float   causticSharpness;
+    float   foamScale;
+    float   foamScrollSpeed;
+    float   foamSlopeMin;
+    float   foamSlopeMax;
+    float   foamSlopeAmplifier;
+    float   foamPower;
+    float   depthFadeNear;
+    float   depthFadeFar;
+    float4  deepWaterTint;
+    float   fresnelF0;
+    float   gamma;
+    float   reflectionDistortion;
+    float   _padRend0;
+    float2  gustDirection;
+    float   gustSpeed;
+    float   gustScale;
+    float   gustStrength;
+    float   _padGust0, _padGust1, _padGust2;
+    float   normalMappingScale;
+    float   normalMappingSpeed;
+    float2  normalMappingDir;
+};
+
+// ---------------------------------------------------------------------------
+// Ocean vertex input
+// Layout: packed float3 position (12) + float2 texCoord (8) = stride 20
+// ---------------------------------------------------------------------------
+
+struct OceanVertexIn {
+    float3 position  [[attribute(0)]];
+    float2 texCoord  [[attribute(1)]];
+};
+
+struct OceanVertexOut {
+    float4 clipPos   [[position]];
+    float3 fragPos;
+    float3 normal;
+    float3 tangent;
+    float3 bitangent;
+    float2 fragUV;
+};
+
+// ---------------------------------------------------------------------------
+// Gerstner wave helpers — mirrors waveOffset() in gerstner.vert
+// ---------------------------------------------------------------------------
+
+float3 gerstnerOffset(float3 basePos, constant WaveUniform* waves, int n, float time) {
+    float3 offset = 0;
+    for (int i = 0; i < n; ++i) {
+        float k = 2.0 * M_PI_F / max(waves[i].wavelength, 0.01f);
+        float w = sqrt(9.81f * k);
+        float2 D = normalize(waves[i].direction);
+        float phase = dot(D * k, basePos.xz) - fmod(w * time, 2.0f * M_PI_F) + waves[i].phase;
+        offset.y   += waves[i].amplitude * cos(phase);
+        float2 xz   = -waves[i].steepness * D * sin(phase) * waves[i].amplitude;
+        offset.x   += xz.x;
+        offset.z   += xz.y;
+    }
+    return offset;
+}
+
+float3 displacedPos(float3 base, constant WaveUniform* waves, int n, float time) {
+    return base + gerstnerOffset(base, waves, n, time);
+}
+
+float2 calcUV(float3 pos, float2 dir, float speed, float scale, float time) {
+    float2 offset = normalize(dir) * speed * time;
+    float2 uv = (pos.xz - float2(-60)) * scale + offset;
+    return fract(uv);
+}
+
+// ---------------------------------------------------------------------------
+// Gust
+// ---------------------------------------------------------------------------
+
+float gustDisplacement(float2 uv, texture2d<float> gustTex, sampler samp,
+                       float strength) {
+    float v = gustTex.sample(samp, uv).r;
+    return (v - 0.5) * 2.0 * strength;
+}
+
+// ---------------------------------------------------------------------------
+// Noise / FBM helpers (shared with fragment)
+// ---------------------------------------------------------------------------
+
+float hashOcean(float2 p) {
+    return fract(sin(dot(p, float2(127.1, 311.7))) * 43758.5453);
+}
+float valueNoiseOcean(float2 p) {
+    float2 i = floor(p), f = fract(p);
+    float a = hashOcean(fmod(i,               289.0f));
+    float b = hashOcean(fmod(i + float2(1,0), 289.0f));
+    float c = hashOcean(fmod(i + float2(0,1), 289.0f));
+    float d = hashOcean(fmod(i + float2(1,1), 289.0f));
+    float2 u = f * f * (3.0 - 2.0 * f);
+    return mix(mix(a,b,u.x), mix(c,d,u.x), u.y);
+}
+float fbmOcean(float2 p) {
+    float s = 0, a = 0.5, fr = 1;
+    for (int i = 0; i < 5; ++i) {
+        s += a * valueNoiseOcean(fmod(p * fr, 289.0f));
+        fr *= 2; a *= 0.5;
+    }
+    return s;
+}
+
+// ---------------------------------------------------------------------------
+// Ocean vertex shader
+// ---------------------------------------------------------------------------
+
+vertex OceanVertexOut oceanVertex(
+    OceanVertexIn             in      [[stage_in]],
+    constant SceneUniforms&   scene   [[buffer(1)]],
+    constant SurfaceUniforms& surface [[buffer(2)]],
+    texture2d<float>          gustTex [[texture(0)]],
+    sampler                   samp    [[sampler(0)]])
+{
+    float3 base = in.position;
+
+    float2 gustUV   = calcUV(base, surface.gustDirection,
+                             surface.gustSpeed, surface.gustScale, scene.time);
+    float2 normalUV = calcUV(base, surface.normalMappingDir,
+                             surface.normalMappingSpeed, surface.normalMappingScale, scene.time);
+
+    float3 newPos = displacedPos(base, scene.waves, scene.numWaves, scene.time);
+    float  gust   = gustDisplacement(gustUV, gustTex, samp, surface.gustStrength);
+    newPos.y += gust;
+
+    // Finite-difference surface normal (matching calcNormal in gerstner.vert)
+    const float eps = 0.01;
+    float3 posX = displacedPos(base + float3(eps, 0, 0), scene.waves, scene.numWaves, scene.time);
+    posX.y += gustDisplacement(gustUV + float2(eps, 0), gustTex, samp, surface.gustStrength);
+    float3 posZ = displacedPos(base + float3(0, 0, eps), scene.waves, scene.numWaves, scene.time);
+    posZ.y += gustDisplacement(gustUV + float2(0, eps), gustTex, samp, surface.gustStrength);
+
+    float3 tangent   = posX - newPos;
+    float3 bitangent = posZ - newPos;
+    float3 normal    = normalize(cross(bitangent, tangent));
+
+    float4 worldPos = scene.modelMatrix * float4(newPos, 1.0);
+
+    OceanVertexOut out;
+    out.clipPos   = scene.projectionMatrix * scene.viewMatrix * worldPos;
+    out.fragPos   = worldPos.xyz;
+    out.normal    = normal;
+    out.tangent   = tangent;
+    out.bitangent = bitangent;
+    out.fragUV    = normalUV;
+    return out;
+}
+
+// ---------------------------------------------------------------------------
+// Wireframe fragment shader (solid colour, no lighting)
+// ---------------------------------------------------------------------------
+
+fragment float4 wireframeFragment(OceanVertexOut in [[stage_in]],
+                                  constant SurfaceUniforms& surface [[buffer(2)]]) {
+    // Subtle blue-green tint matching the reference wireframe colour
+    return float4(0.15, 0.36, 0.25, 1.0);
+}
+
+// ---------------------------------------------------------------------------
+// Fresnel helpers
+// ---------------------------------------------------------------------------
+
+float3 fresnelSchlick(float cosTheta, float f0) {
+    return f0 + (1.0 - f0) * pow(1.0 - cosTheta, 5.0);
+}
+
+// ---------------------------------------------------------------------------
+// Ocean fragment shader — port of water.frag
+// ---------------------------------------------------------------------------
+
+fragment float4 oceanFragment(
+    OceanVertexOut            in          [[stage_in]],
+    constant SceneUniforms&   scene       [[buffer(1)]],
+    constant SurfaceUniforms& surface     [[buffer(2)]],
+    texture2d<float>          normalMap   [[texture(0)]],
+    texturecube<float>        envMap      [[texture(1)]],
+    texture2d<float>          reflTex     [[texture(2)]],
+    sampler                   repeatSamp  [[sampler(0)]],
+    sampler                   clampSamp   [[sampler(1)]])
+{
+    float3x3 TBN = float3x3(normalize(in.tangent),
+                             normalize(in.bitangent),
+                             normalize(in.normal));
+
+    float3 sampledN = normalMap.sample(repeatSamp, in.fragUV).rgb * 2.0 - 1.0;
+    float3 normal   = normalize(TBN * sampledN);
+
+    float3 lightDir = normalize(scene.lightPos.xyz - in.fragPos);
+    float3 viewDir  = normalize(scene.cameraPos.xyz - in.fragPos);
+
+    float diff = max(dot(normal, lightDir), 0.0f);
+
+    float3 reflectedDir = reflect(-viewDir, normal);
+    float3 envRefl = envMap.sample(clampSamp, reflectedDir).rgb;
+
+    // Planar reflection — project frag pos into reflection UV
+    float4 clipRefl = scene.reflectionMatrix * float4(in.fragPos, 1.0);
+    float2 reflUV   = (clipRefl.xy / clipRefl.w) * 0.5 + 0.5;
+    reflUV += float2(normal.x, normal.z) * surface.reflectionDistortion;
+    reflUV  = clamp(reflUV, 0.001, 0.999);
+    float3 planarRefl = reflTex.sample(clampSamp, reflUV).rgb;
+
+    float  cosTheta       = max(dot(viewDir, normal), 0.0f);
+    float  planarWeight   = 1.0 - cosTheta;
+    float3 combinedRefl   = mix(envRefl, planarRefl, planarWeight);
+    float3 fresnel        = fresnelSchlick(cosTheta, surface.fresnelF0);
+    float3 reflection     = fresnel * combinedRefl;
+
+    // Depth-based colour
+    float  depth     = length(scene.cameraPos.xyz - in.fragPos);
+    float  depthFade = smoothstep(surface.depthFadeNear, surface.depthFadeFar, depth);
+    float3 baseColor = surface.baseColor.rgb;
+    float3 deepColor = baseColor * surface.deepWaterTint.xyz;
+    float3 color     = mix(baseColor, deepColor, depthFade);
+    color = pow(color, surface.gamma);
+
+    float3 diffuse = (1.0 - fresnel) * diff * color;
+
+    // Caustics
+    float causticStr = smoothstep(surface.causticTroughMin, surface.causticTroughMax,
+                                   -in.fragPos.y);
+    float2 flickUV   = in.fragPos.xz * surface.causticScale + scene.time * surface.causticSpeed;
+    float  flicker   = fbmOcean(flickUV);
+    flicker = smoothstep(surface.causticThresholdMin, surface.causticThresholdMax, flicker);
+    float  NdotL     = max(dot(normalize(in.normal), normalize(scene.lightPos.xyz - in.fragPos)), 0.0f);
+    flicker *= NdotL;
+    flicker  = pow(flicker, surface.causticSharpness);
+    float3 caustic = surface.causticColor.xyz * flicker * causticStr * surface.causticIntensity;
+
+    float3 finalColor = reflection + diffuse + caustic;
+
+    // Foam
+    float slope    = length(float2(dfdx(in.fragPos.y), dfdy(in.fragPos.y))) * surface.foamSlopeAmplifier;
+    float2 slopeDir = normalize(float2(dfdx(in.fragPos.y), dfdy(in.fragPos.y)));
+    float2 foamUV  = in.fragPos.xz + slopeDir * scene.time * surface.foamScrollSpeed;
+    float  foam    = fbmOcean(foamUV * surface.foamScale);
+    float  foamMask = smoothstep(surface.foamSlopeMin, surface.foamSlopeMax, slope);
+    foam = pow(foam * foamMask, surface.foamPower);
+    finalColor = mix(finalColor, float3(1.0), foam);
+
+    // Fog
+    float fogFactor = clamp(exp(-surface.fogDensity * depth), 0.0f, 1.0f);
+    finalColor = mix(surface.fogColor.xyz, finalColor, fogFactor);
+
+    return float4(finalColor, 1.0);
+}
+
+// ---------------------------------------------------------------------------
+// Skybox — fullscreen unit-cube trick; no vertex buffer needed
+// ---------------------------------------------------------------------------
+
+constant float3 skyboxVerts[36] = {
+    // -Z face
+    {-1,-1,-1},{-1, 1,-1},{ 1, 1,-1},{ 1, 1,-1},{ 1,-1,-1},{-1,-1,-1},
+    // +Z face
+    {-1,-1, 1},{ 1,-1, 1},{ 1, 1, 1},{ 1, 1, 1},{-1, 1, 1},{-1,-1, 1},
+    // -X face
+    {-1, 1, 1},{-1, 1,-1},{-1,-1,-1},{-1,-1,-1},{-1,-1, 1},{-1, 1, 1},
+    // +X face
+    { 1, 1,-1},{ 1, 1, 1},{ 1,-1, 1},{ 1,-1, 1},{ 1,-1,-1},{ 1, 1,-1},
+    // -Y face
+    {-1,-1,-1},{ 1,-1,-1},{ 1,-1, 1},{ 1,-1, 1},{-1,-1, 1},{-1,-1,-1},
+    // +Y face
+    {-1, 1,-1},{-1, 1, 1},{ 1, 1, 1},{ 1, 1, 1},{ 1, 1,-1},{-1, 1,-1},
+};
+
+struct SkyboxOut {
+    float4 clipPos [[position]];
+    float3 texDir;
+};
+
+vertex SkyboxOut skyboxVertex(uint vid [[vertex_id]],
+                              constant SceneUniforms& scene [[buffer(1)]]) {
+    float3 pos = skyboxVerts[vid];
+    // Strip translation from view matrix
+    float4x4 viewNoTranslation = float4x4(
+        scene.viewMatrix[0],
+        scene.viewMatrix[1],
+        scene.viewMatrix[2],
+        float4(0, 0, 0, 1));
+    float4 clipPos = scene.projectionMatrix * viewNoTranslation * float4(pos, 1.0);
+    // Push to far plane: set z = w so depth = 1.0 after divide
+    SkyboxOut out;
+    out.clipPos = clipPos.xyww;
+    out.texDir  = pos;
+    return out;
+}
+
+fragment float4 skyboxFragment(SkyboxOut       in     [[stage_in]],
+                               texturecube<float> envMap [[texture(0)]],
+                               sampler            samp   [[sampler(0)]]) {
+    return float4(envMap.sample(samp, normalize(in.texDir)).rgb, 1.0);
+}

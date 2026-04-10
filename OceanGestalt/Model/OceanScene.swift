@@ -37,7 +37,7 @@ struct MeshConfig {
 /// lives here — each Prop holds a Drawable that handles that.
 /// Mirrors src/core/include/Configuration.hpp (sceneModels, camera, light, mesh).
 @MainActor
-final class Scene {
+final class OceanScene {
     let camera: CameraConfig
     let lightPosition: SIMD3<Float>
     let mesh: MeshConfig
@@ -57,16 +57,16 @@ final class Scene {
               let data = try? Data(contentsOf: url),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else {
-            throw SceneError.fileNotFound
+            throw OceanSceneError.fileNotFound
         }
 
-        camera       = try Scene.parseCamera(json)
-        lightPosition = try Scene.parseLight(json)
-        mesh         = try Scene.parseMesh(json)
+        camera       = try OceanScene.parseCamera(json)
+        lightPosition = try OceanScene.parseLight(json)
+        mesh         = try OceanScene.parseMesh(json)
         reflectionSize = (json["reflection"] as? [String: Any]).flatMap { $0["size"] as? Int } ?? 512
         shadowSize     = (json["shadow"]     as? [String: Any]).flatMap { $0["size"] as? Int } ?? 2048
 
-        let modelConfigs = try Scene.parseModels(json)
+        let modelConfigs = try OceanScene.parseModels(json)
         props = try modelConfigs.map { config in
             let drawable = try drawableFactory(config, device)
             let moveable = Moveable(
@@ -119,7 +119,7 @@ final class Scene {
     // MARK: - JSON parsing
 
     private static func parseCamera(_ json: [String: Any]) throws -> CameraConfig {
-        guard let cam = json["camera"] as? [String: Any] else { throw SceneError.missingKey("camera") }
+        guard let cam = json["camera"] as? [String: Any] else { throw OceanSceneError.missingKey("camera") }
         return CameraConfig(
             position: try parseVec3(cam, key: "position"),
             yaw:   (cam["yaw"]   as? Double).map(Float.init) ?? -90,
@@ -129,7 +129,7 @@ final class Scene {
     }
 
     private static func parseLight(_ json: [String: Any]) throws -> SIMD3<Float> {
-        guard let l = json["light"] as? [String: Any] else { throw SceneError.missingKey("light") }
+        guard let l = json["light"] as? [String: Any] else { throw OceanSceneError.missingKey("light") }
         return SIMD3<Float>(
             (l["x"] as? Double).map(Float.init) ?? 0,
             (l["y"] as? Double).map(Float.init) ?? 0,
@@ -138,7 +138,7 @@ final class Scene {
     }
 
     private static func parseMesh(_ json: [String: Any]) throws -> MeshConfig {
-        guard let m = json["mesh"] as? [String: Any] else { throw SceneError.missingKey("mesh") }
+        guard let m = json["mesh"] as? [String: Any] else { throw OceanSceneError.missingKey("mesh") }
         return MeshConfig(
             size:         (m["size"]         as? Int) ?? 60,
             subdivisions: (m["subdivisions"] as? Int) ?? 2
@@ -151,7 +151,7 @@ final class Scene {
             guard let name   = m["name"]   as? String,
                   let file   = m["file"]   as? String,
                   let shader = m["shader"] as? String
-            else { throw SceneError.malformedModel }
+            else { throw OceanSceneError.malformedModel }
             return ModelConfig(
                 name:               name,
                 file:               file,
@@ -182,13 +182,13 @@ final class Scene {
         if let arr = dict[key] as? [Double], arr.count >= 3 {
             return SIMD3<Float>(Float(arr[0]), Float(arr[1]), Float(arr[2]))
         }
-        throw SceneError.missingKey(key)
+        throw OceanSceneError.missingKey(key)
     }
 }
 
 // MARK: - Errors
 
-enum SceneError: Error {
+enum OceanSceneError: Error {
     case fileNotFound
     case missingKey(String)
     case malformedModel

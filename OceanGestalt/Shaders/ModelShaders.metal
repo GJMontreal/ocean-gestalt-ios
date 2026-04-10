@@ -61,7 +61,9 @@ struct GltfVertexOut {
     float4 clipPos  [[position]];
     float3 fragPos;
     float2 texCoord;
-    float3x3 TBN;   // tangent-space to world-space transform
+    float3 tangent;
+    float3 bitangent;
+    float3 normal;
 };
 
 // ---------------------------------------------------------------------------
@@ -141,10 +143,12 @@ vertex GltfVertexOut modelVertex(
     float3 B = cross(N, T) * in.tangent.w;
 
     GltfVertexOut out;
-    out.fragPos  = (modelMatrix * float4(in.position, 1.0)).xyz;
-    out.texCoord = in.texCoord;
-    out.TBN      = float3x3(T, B, N);
-    out.clipPos  = scene.projectionMatrix * scene.viewMatrix * float4(out.fragPos, 1.0);
+    out.fragPos   = (modelMatrix * float4(in.position, 1.0)).xyz;
+    out.texCoord  = in.texCoord;
+    out.tangent   = T;
+    out.bitangent = B;
+    out.normal    = N;
+    out.clipPos   = scene.projectionMatrix * scene.viewMatrix * float4(out.fragPos, 1.0);
     return out;
 }
 
@@ -177,8 +181,9 @@ fragment float4 modelFragment(
     float3 albedo = colorMap.sample(samp, in.texCoord).rgb;
 
     // Normal (tangent → world)
+    float3x3 TBN    = float3x3(normalize(in.tangent), normalize(in.bitangent), normalize(in.normal));
     float3 sampledN = normalMap.sample(samp, in.texCoord).rgb * 2.0 - 1.0;
-    float3 normal   = normalize(in.TBN * sampledN);
+    float3 normal   = normalize(TBN * sampledN);
 
     // Bump perturbation
     float height = mrMap.sample(samp, in.texCoord).r;
