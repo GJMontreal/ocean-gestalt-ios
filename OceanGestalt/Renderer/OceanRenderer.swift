@@ -287,9 +287,6 @@ final class OceanRenderer {
         if let enc = cmdBuf.makeRenderCommandEncoder(descriptor: rpd) {
             enc.label = "MainPass"
 
-            // Skybox — draw first, no depth write, at far plane
-            encodeSkybox(enc, scene: mainSceneU)
-
             // Ocean solid (model matrix = identity, stored in SceneUniforms.modelMatrix)
             encodeOcean(enc, scene: mainSceneU, surface: surfaceU,
                         wireframe: false, time: time)

@@ -10,23 +10,33 @@ struct ContentView: View {
 
     var body: some View {
         ZStack {
-            MetalView(engine: engine)
-                .ignoresSafeArea()
+            if let camera = engine.camera {
+                MetalView(engine: engine)
+                    .ignoresSafeArea()
 
-            VStack {
-                Spacer()
-                HStack(spacing: 24) {
-                    Button(engine.isRunning ? "Pause" : "Resume") {
-                        engine.togglePause()
+                WASDOverlayView(controller: camera)
+                    .ignoresSafeArea()
+
+                // Pause / mute buttons in the top-left corner
+                VStack {
+                    HStack {
+                        Button(engine.isRunning ? "Pause" : "Resume") {
+                            engine.togglePause()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        Button(engine.isMuted ? "Unmute" : "Mute") {
+                            engine.toggleMute()
+                        }
+                        .buttonStyle(.bordered)
+                        Spacer()
                     }
-                    Button(engine.isMuted ? "Unmute" : "Mute") {
-                        engine.toggleMute()
-                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 60)
+                    Spacer()
                 }
-                .buttonStyle(.borderedProminent)
-                .padding(.bottom, 40)
             }
         }
+        .background(Color.black)
     }
 }
 
@@ -65,11 +75,11 @@ final class OceanEngine: ObservableObject {
     func setup(view: MTKView) {
         guard let renderer, let camera else { return }
 
-        view.device               = device
-        view.colorPixelFormat     = .bgra8Unorm
+        view.device                  = device
+        view.colorPixelFormat        = .bgra8Unorm
         view.depthStencilPixelFormat = .depth32Float
-        view.sampleCount          = 1
-        view.clearColor           = MTLClearColorMake(0, 0.05, 0.1, 1)
+        view.sampleCount             = 1
+        view.clearColor              = MTLClearColorMake(0, 0.05, 0.1, 1)
 
         let adp = MetalKitCameraAdapter(controller: camera, view: view)
         adp.onDraw = { [weak self] v, transform in
@@ -103,9 +113,10 @@ struct MetalView: UIViewRepresentable {
         let view = MTKView(frame: .zero, device: engine.device)
         engine.setup(view: view)
 
-        // Pan → camera rotation
+        // Pan → camera rotation (single finger)
         let pan = UIPanGestureRecognizer(target: context.coordinator,
                                          action: #selector(Coordinator.handlePan(_:)))
+        pan.maximumNumberOfTouches = 1
         view.addGestureRecognizer(pan)
         return view
     }
@@ -127,7 +138,7 @@ struct MetalView: UIViewRepresentable {
             case .began:
                 lastTranslation = .zero
             case .changed:
-                let t = gesture.translation(in: gesture.view)
+                let t  = gesture.translation(in: gesture.view)
                 let dx = Float(t.x - lastTranslation.x)
                 let dy = Float(t.y - lastTranslation.y)
                 lastTranslation = t
