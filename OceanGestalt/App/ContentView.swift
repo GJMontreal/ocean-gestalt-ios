@@ -25,8 +25,10 @@ struct ContentView: View {
                     .gesture(
                         DragGesture(minimumDistance: 1)
                             .onChanged { value in
-                                let dx = Float(value.location.x - lastDragLocation.x)
-                                let dy = Float(value.location.y - lastDragLocation.y)
+                                let prev = lastDragLocation == .zero
+                                         ? value.startLocation : lastDragLocation
+                                let dx = Float(value.location.x - prev.x)
+                                let dy = Float(value.location.y - prev.y)
                                 lastDragLocation = value.location
                                 camera.applyRotationGesture(dx: dx, dy: dy)
                             }
