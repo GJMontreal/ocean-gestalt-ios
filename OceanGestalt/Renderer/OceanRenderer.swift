@@ -240,6 +240,10 @@ final class OceanRenderer {
         // Surface uniforms shared across passes
         let surfaceU = uniforms.buildSurfaceUniforms()
 
+        // ---- Acquire drawable up-front — bail before any encoding if unavailable ----
+        guard let rpd      = view.currentRenderPassDescriptor,
+              let drawable = view.currentDrawable else { return }
+
         // ---- Command buffer ----
         guard let cmdBuf = commandQueue.makeCommandBuffer() else { return }
         cmdBuf.label = "OceanFrame"
@@ -267,11 +271,6 @@ final class OceanRenderer {
         }
 
         // ---- Main pass ----
-        guard let rpd      = view.currentRenderPassDescriptor,
-              let drawable = view.currentDrawable else {
-            cmdBuf.commit()
-            return
-        }
 
         let mainSceneU = uniforms.buildSceneUniforms(
             time:             time,

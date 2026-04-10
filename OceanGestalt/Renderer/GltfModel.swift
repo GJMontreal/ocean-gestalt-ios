@@ -35,6 +35,7 @@ final class GltfModel: Drawable {
     private let depthState: MTLDepthStencilState
     private let wireDepthState: MTLDepthStencilState  // less, no write — wire below surface
     private let sampler: MTLSamplerState
+    private let envMap: MTLTexture?
 
     // MARK: - Geometry & materials
 
@@ -91,6 +92,7 @@ final class GltfModel: Drawable {
         envMap: MTLTexture?
     ) throws {
         self.device = device
+        self.envMap = envMap
 
         // ---- Pipelines ----
         let pipeDesc = MTLRenderPipelineDescriptor()
@@ -235,6 +237,7 @@ final class GltfModel: Drawable {
             encoder.setFragmentTexture(mat.colorTex,  index: 0)
             encoder.setFragmentTexture(mat.normalTex, index: 1)
             encoder.setFragmentTexture(mat.mrTex,     index: 2)
+            encoder.setFragmentTexture(envMap,        index: 3)
             encoder.setFragmentSamplerState(sampler, index: 0)
 
             if isReflection {
