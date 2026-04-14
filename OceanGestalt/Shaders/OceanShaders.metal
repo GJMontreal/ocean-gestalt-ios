@@ -395,9 +395,12 @@ fragment float4 skyboxFragment(SkyboxOut       in     [[stage_in]],
 
 /// Packed layout matching OceanVertex in MeshBuilder.swift:
 /// position (12 bytes) + texCoord (8 bytes) = stride 20.
+/// packed_float2 is used (not float2) to keep 4-byte alignment and
+/// match the Swift struct stride exactly — float2 has 8-byte alignment
+/// which would pad the struct to 24 bytes and mis-index every vertex.
 struct OceanVertexData {
     packed_float3 position;
-    float2        texCoord;
+    packed_float2 texCoord;
 };
 
 /// Subsampling parameters passed from OceanRenderer.encodeNormals().
