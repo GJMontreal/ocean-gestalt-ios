@@ -40,25 +40,34 @@ struct ContentView: View {
                 WASDOverlayView(controller: camera)
                     .ignoresSafeArea()
 
-                // 4 — Pause / mute
-                VStack {
-                    HStack {
-                        Button(engine.isRunning ? "Pause" : "Resume") {
-                            engine.togglePause()
-                        }
-                        .buttonStyle(.borderedProminent)
-                        Button(engine.isMuted ? "Unmute" : "Mute") {
-                            engine.toggleMute()
-                        }
-                        .buttonStyle(.bordered)
-                        Spacer()
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 60)
-                    Spacer()
+                // 4 — Pause / mute: right column below the motion toggle (52pt + 20pt top + 8pt gap)
+                VStack(spacing: 8) {
+                    controlButton(
+                        systemImage: engine.isRunning ? "pause.fill" : "play.fill",
+                        action: { engine.togglePause() }
+                    )
+                    controlButton(
+                        systemImage: engine.isMuted ? "speaker.slash.fill" : "speaker.fill",
+                        action: { engine.toggleMute() }
+                    )
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                .padding(.top, 80)
+                .padding(.trailing, 20)
             }
             .background(Color.black)
+        }
+    }
+
+    @ViewBuilder
+    private func controlButton(systemImage: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 22, weight: .medium))
+                .frame(width: 52, height: 52)
+                .background(.black.opacity(0.55))
+                .foregroundStyle(.white)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
         }
     }
 }
