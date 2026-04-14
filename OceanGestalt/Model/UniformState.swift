@@ -50,6 +50,7 @@ final class UniformState {
     var foamSlopeMax: Float            = 1.97
     var foamSlopeAmplifier: Float      = 72.68
     var foamPower: Float               = 0.5
+    var foamEdgeNoise: Float           = 0.5
     var depthFadeNear: Float           = 10.0
     var depthFadeFar: Float            = 80.0
     var deepWaterTint: SIMD3<Float>    = SIMD3<Float>(0.1, 0.2, 0.3)
@@ -149,6 +150,7 @@ final class UniformState {
         s.foamSlopeMax          = foamSlopeMax
         s.foamSlopeAmplifier    = foamSlopeAmplifier
         s.foamPower             = foamPower
+        s.foamEdgeNoise         = foamEdgeNoise
         s.depthFadeNear         = depthFadeNear
         s.depthFadeFar          = depthFadeFar
         s.deepWaterTint         = SIMD4<Float>(deepWaterTint.x, deepWaterTint.y, deepWaterTint.z, 0)
@@ -246,6 +248,8 @@ final class UniformState {
             if let v = floatValue(rawValue) { foamSlopeAmplifier = v }
         case "mesh_shader.foamPower":
             if let v = floatValue(rawValue) { foamPower = v }
+        case "mesh_shader.foamEdgeNoise":
+            if let v = floatValue(rawValue) { foamEdgeNoise = v }
         case "mesh_shader.depthFadeNear":
             if let v = floatValue(rawValue) { depthFadeNear = v }
         case "mesh_shader.depthFadeFar":

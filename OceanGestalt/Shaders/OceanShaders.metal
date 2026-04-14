@@ -64,7 +64,8 @@ struct SurfaceUniforms {
     float   gustScale;
     float   gustStrength;
     float   reflectionStrength;
-    float   _padGust1, _padGust2;
+    float   foamEdgeNoise;
+    float   _padGust2;
     float   normalMappingScale;
     float   normalMappingSpeed;
     float2  normalMappingDir;
@@ -302,8 +303,9 @@ fragment float4 oceanFragment(
     // Caustics
     float causticStr = smoothstep(surface.causticTroughMin, surface.causticTroughMax,
                                    -in.fragPos.y);
-    float2 flickUV   = in.fragPos.xz * surface.causticScale + scene.time * surface.causticSpeed;
-    float  flicker   = fbmOcean(flickUV);
+    float2 flickUV1  = in.fragPos.xz * surface.causticScale + scene.time * surface.causticSpeed * float2( 1.0,  0.7);
+    float2 flickUV2  = in.fragPos.xz * surface.causticScale + scene.time * surface.causticSpeed * float2(-0.7,  1.0);
+    float  flicker   = clamp(fbmOcean(flickUV1) * fbmOcean(flickUV2) * 4.0, 0.0, 1.0);
     flicker = smoothstep(surface.causticThresholdMin, surface.causticThresholdMax, flicker);
     float  NdotL     = max(dot(normalize(in.normal), normalize(scene.lightPos.xyz - in.fragPos)), 0.0f);
     flicker *= NdotL;
@@ -317,7 +319,9 @@ fragment float4 oceanFragment(
     float2 slopeDir = normalize(float2(dfdx(in.fragPos.y), dfdy(in.fragPos.y)));
     float2 foamUV  = in.fragPos.xz + slopeDir * scene.time * surface.foamScrollSpeed;
     float  foam    = fbmOcean(foamUV * surface.foamScale);
-    float  foamMask = smoothstep(surface.foamSlopeMin, surface.foamSlopeMax, slope);
+    // Perturb the lower threshold with the foam noise so the bottom edge is ragged
+    // rather than a clean geometric line.
+    float  foamMask = smoothstep(surface.foamSlopeMin - foam * surface.foamEdgeNoise, surface.foamSlopeMax, slope);
     foam = pow(foam * foamMask, surface.foamPower);
     finalColor = mix(finalColor, float3(1.0), foam);
 
