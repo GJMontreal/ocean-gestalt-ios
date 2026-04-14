@@ -147,6 +147,17 @@ final class Prop {
         drawable.encodeReflection(into: encoder, modelMatrix: mdl, scene: scene, surface: surface)
     }
 
+    func encodeDebugMesh(
+        into encoder: MTLRenderCommandEncoder,
+        time: Float,
+        waveOffset: (SIMD2<Float>) -> SIMD3<Float>,
+        scene: SceneUniforms,
+        surface: SurfaceUniforms
+    ) {
+        let mdl = modelMatrix(time: time, waveOffset: waveOffset)
+        drawable.encodeDebugMesh(into: encoder, modelMatrix: mdl, scene: scene, surface: surface)
+    }
+
     // MARK: - Matrix helpers
 
     private func translationMatrix(_ t: SIMD3<Float>) -> simd_float4x4 {

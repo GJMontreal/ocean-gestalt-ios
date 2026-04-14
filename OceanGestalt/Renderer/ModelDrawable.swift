@@ -228,6 +228,42 @@ final class ModelDrawable: @MainActor Drawable {
                      isReflection: true)
     }
 
+    nonisolated func encodeDebugMesh(
+        into encoder: MTLRenderCommandEncoder,
+        modelMatrix: simd_float4x4,
+        scene: SceneUniforms,
+        surface: SurfaceUniforms
+    ) {
+        var scn = scene
+        var mdl = modelMatrix
+        // clip=-2: fragment shader detects < -1.5 and returns wireframe color without
+        // any waterline clipping or lighting.
+        var mu  = makeModelUniforms(clip: -2)
+
+        for prim in primitives {
+            encoder.setRenderPipelineState(wirePipeline)
+            encoder.setDepthStencilState(wireDepthState)
+            encoder.setVertexBuffer(prim.vertexBuffer, offset: 0, index: 0)
+            encoder.setVertexBytes(&scn, length: MemoryLayout<SceneUniforms>.size,  index: 1)
+            encoder.setVertexBytes(&mdl, length: MemoryLayout<simd_float4x4>.size,  index: 2)
+            encoder.setFragmentBytes(&scn, length: MemoryLayout<SceneUniforms>.size, index: 1)
+            encoder.setFragmentBytes(&mu,  length: MemoryLayout<ModelUniforms>.size, index: 3)
+            // Textures are not read when clip < -1.5 but the shader still requires bound slots.
+            let mat = (prim.materialIndex >= 0 && prim.materialIndex < materials.count)
+                    ? materials[prim.materialIndex] : Material()
+            encoder.setFragmentTexture(mat.colorTex,  index: 0)
+            encoder.setFragmentTexture(mat.normalTex, index: 1)
+            encoder.setFragmentTexture(mat.mrTex,     index: 2)
+            encoder.setFragmentTexture(envMap,        index: 3)
+            encoder.setFragmentSamplerState(sampler, index: 0)
+            encoder.drawIndexedPrimitives(type: .line,
+                                          indexCount: prim.edgeCount,
+                                          indexType: .uint32,
+                                          indexBuffer: prim.edgeBuffer,
+                                          indexBufferOffset: 0)
+        }
+    }
+
     // MARK: - Private encode
 
     private func encodePasses(

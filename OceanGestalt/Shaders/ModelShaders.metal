@@ -166,13 +166,18 @@ fragment float4 modelFragment(
     texturecube<float>   envMap       [[texture(3)]],
     sampler              samp         [[sampler(0)]])
 {
+    // Debug full-body wireframe: skip all clipping and lighting
+    if (model.waterlineClip < -1.5) {
+        return float4(model.wireframeColor.xyz, 1.0);
+    }
+
     // Waterline clip
     float surfaceY = waveHeightAt(in.fragPos.xz, scene.waves, scene.numWaves, scene.time)
                    - model.waterlineBias;
     if (model.waterlineClip >  0.5 && in.fragPos.y <  surfaceY) discard_fragment();
     if (model.waterlineClip < -0.5 && in.fragPos.y >= surfaceY) discard_fragment();
 
-    // Wireframe pass: just output the wireframe colour
+    // Wireframe pass (below waterline only): just output the wireframe colour
     if (model.waterlineClip < -0.5) {
         return float4(model.wireframeColor.xyz, 1.0);
     }

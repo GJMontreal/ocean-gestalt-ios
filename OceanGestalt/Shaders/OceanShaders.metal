@@ -381,3 +381,64 @@ fragment float4 skyboxFragment(SkyboxOut       in     [[stage_in]],
                                sampler            samp   [[sampler(0)]]) {
     return float4(envMap.sample(samp, normalize(in.texDir)).rgb, 1.0);
 }
+
+// ---------------------------------------------------------------------------
+// Surface-normals visualisation — draws one yellow line per ocean vertex,
+// originating at the Gerstner-displaced surface position (same displacement
+// as oceanVertex so lines sit exactly on the wave surface).
+//
+// Metal has no geometry shaders; the vertex_id trick is used instead:
+//   vertexID / 2  → ocean vertex index
+//   vertexID % 2  → 0 = base, 1 = tip
+// Draw vertexCount*2 vertices as .line primitives (pairs → line segments).
+// ---------------------------------------------------------------------------
+
+/// Packed layout matching OceanVertex in MeshBuilder.swift:
+/// position (12 bytes) + texCoord (8 bytes) = stride 20.
+struct OceanVertexData {
+    packed_float3 position;
+    float2        texCoord;
+};
+
+struct NormalsVertOut {
+    float4 clipPos [[position]];
+    float3 color;
+};
+
+vertex NormalsVertOut normalsVertex(
+    uint                      vertexID [[vertex_id]],
+    constant OceanVertexData* vertices [[buffer(0)]],
+    constant SceneUniforms&   scene    [[buffer(1)]])
+{
+    uint  vi    = vertexID / 2;
+    bool  isTip = (vertexID & 1) == 1;
+
+    float3 base = float3(vertices[vi].position);
+
+    // Gerstner displacement — identical to oceanVertex (gust excluded so that
+    // normals reflect the true wave surface, not the gentle vertical gust offset).
+    float3 newPos = displacedPos(base, scene.waves, scene.numWaves, scene.time);
+
+    const float eps = 0.01;
+    float3 posX = displacedPos(base + float3(eps, 0, 0), scene.waves, scene.numWaves, scene.time);
+    float3 posZ = displacedPos(base + float3(0, 0, eps), scene.waves, scene.numWaves, scene.time);
+
+    float3 tangent   = posX - newPos;
+    float3 bitangent = posZ - newPos;
+    float3 normal    = normalize(cross(bitangent, tangent));
+
+    float4 worldPos    = scene.modelMatrix * float4(newPos, 1.0);
+    float3 worldNormal = normalize((scene.modelMatrix * float4(normal, 0.0)).xyz);
+
+    const float MAGNITUDE = 0.5;
+    float3 pos = isTip ? worldPos.xyz + worldNormal * MAGNITUDE : worldPos.xyz;
+
+    NormalsVertOut out;
+    out.clipPos = scene.projectionMatrix * scene.viewMatrix * float4(pos, 1.0);
+    out.color   = float3(1.0, 1.0, 0.0);  // yellow — matches C++ reference gerstner_normal.gs
+    return out;
+}
+
+fragment float4 normalsFragment(NormalsVertOut in [[stage_in]]) {
+    return float4(in.color, 1.0);
+}

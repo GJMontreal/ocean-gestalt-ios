@@ -17,6 +17,11 @@ final class OceanRenderer {
     var isRunning: Bool = true
     var audio:    SurfAudio? = nil
 
+    /// 'm' key: when false, draws all props as a full-body wireframe instead of shaded.
+    var showMesh: Bool = true
+    /// 'n' key: when true, draws yellow surface-normal lines on the ocean mesh.
+    var showNormals: Bool = false
+
     var initialCameraTransform: CameraTransform {
         // Use identity (0,1,5 looking toward -Z) while debugging the Drawable path.
         // The scene.json camera is at X≈20 looking in +Z, putting the cube at
@@ -29,6 +34,7 @@ final class OceanRenderer {
     private let commandQueue: MTLCommandQueue
     private let oceanPipeline:      MTLRenderPipelineState  // solid ocean
     private let oceanWirePipeline:  MTLRenderPipelineState  // wireframe ocean
+    private let normalsPipeline:    MTLRenderPipelineState  // surface normals debug lines
     private let skyboxPipeline:     MTLRenderPipelineState
 
     private let solidDepthState:    MTLDepthStencilState    // less, write
@@ -135,6 +141,14 @@ final class OceanRenderer {
         wireDesc.vertexFunction   = library.makeFunction(name: "oceanVertex")
         wireDesc.fragmentFunction = library.makeFunction(name: "wireframeFragment")
         oceanWirePipeline = try device.makeRenderPipelineState(descriptor: wireDesc)
+
+        // No vertex descriptor: normalsVertex reads the vertex buffer directly via buffer(0)
+        let normDesc = MTLRenderPipelineDescriptor()
+        normDesc.colorAttachments[0].pixelFormat = colorPixelFormat
+        normDesc.depthAttachmentPixelFormat      = depthPixelFormat
+        normDesc.vertexFunction   = library.makeFunction(name: "normalsVertex")
+        normDesc.fragmentFunction = library.makeFunction(name: "normalsFragment")
+        normalsPipeline = try device.makeRenderPipelineState(descriptor: normDesc)
 
         // ---- Skybox pipeline ----
         let skyDesc = MTLRenderPipelineDescriptor()
@@ -308,9 +322,19 @@ final class OceanRenderer {
             encodeOcean(enc, scene: wireSceneU, surface: surfaceU,
                         wireframe: true, time: time)
 
-            // Scene models
-            scene.encode(into: enc, time: time, waveOffset: waveOff,
-                         scene: sceneU, surface: surfaceU)
+            // Scene models: shaded (normal) or full wireframe (debug)
+            if showMesh {
+                scene.encode(into: enc, time: time, waveOffset: waveOff,
+                             scene: sceneU, surface: surfaceU)
+            } else {
+                scene.encodeDebugMesh(into: enc, time: time, waveOffset: waveOff,
+                                      scene: sceneU, surface: surfaceU)
+            }
+
+            // Surface normals debug lines
+            if showNormals {
+                encodeNormals(enc, scene: sceneU)
+            }
 
             enc.endEncoding()
         }
@@ -361,6 +385,17 @@ final class OceanRenderer {
         enc.drawIndexedPrimitives(type: prim, indexCount: cnt,
                                   indexType: .uint32,
                                   indexBuffer: buf, indexBufferOffset: 0)
+    }
+
+    private func encodeNormals(_ enc: MTLRenderCommandEncoder,
+                                scene: SceneUniforms) {
+        enc.setRenderPipelineState(normalsPipeline)
+        enc.setDepthStencilState(solidDepthState)
+        enc.setVertexBuffer(oceanMesh.vertexBuffer, offset: 0, index: 0)
+        var scn = scene
+        enc.setVertexBytes(&scn, length: MemoryLayout<SceneUniforms>.size, index: 1)
+        enc.drawPrimitives(type: .line, vertexStart: 0,
+                           vertexCount: oceanMesh.vertexCount * 2)
     }
 
     // MARK: - Texture loading

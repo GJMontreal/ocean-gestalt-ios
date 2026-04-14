@@ -133,8 +133,22 @@ final class OceanEngine: ObservableObject {
             r.audio = SurfAudio()
             renderer = r
 
-            camera = GestureCameraController(
+            let cam = GestureCameraController(
                 initialTransform: r.initialCameraTransform)
+            cam.onCustomKey = { [weak r] key in
+                guard let r else { return false }
+                switch key.keyCode {
+                case .keyboardM:
+                    r.showMesh.toggle()
+                    return true
+                case .keyboardN:
+                    r.showNormals.toggle()
+                    return true
+                default:
+                    return false
+                }
+            }
+            camera = cam
         } catch {
             print("OceanEngine: init failed — \(error)")
         }

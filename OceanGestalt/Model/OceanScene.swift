@@ -116,6 +116,19 @@ final class OceanScene {
         }
     }
 
+    func encodeDebugMesh(
+        into encoder: MTLRenderCommandEncoder,
+        time: Float,
+        waveOffset: (SIMD2<Float>) -> SIMD3<Float>,
+        scene: SceneUniforms,
+        surface: SurfaceUniforms
+    ) {
+        for prop in props {
+            prop.encodeDebugMesh(into: encoder, time: time, waveOffset: waveOffset,
+                                 scene: scene, surface: surface)
+        }
+    }
+
     // MARK: - JSON parsing
 
     private static func parseCamera(_ json: [String: Any]) throws -> CameraConfig {

@@ -20,10 +20,26 @@ protocol Drawable: AnyObject {
         scene: SceneUniforms,
         surface: SurfaceUniforms
     )
+
+    /// Encode a full-body wireframe overlay for diagnostic use ('m' key).
+    /// Default: no-op. Override in concrete drawables to draw edge geometry.
+    func encodeDebugMesh(
+        into encoder: MTLRenderCommandEncoder,
+        modelMatrix: simd_float4x4,
+        scene: SceneUniforms,
+        surface: SurfaceUniforms
+    )
 }
 
 extension Drawable {
     func encodeReflection(
+        into encoder: MTLRenderCommandEncoder,
+        modelMatrix: simd_float4x4,
+        scene: SceneUniforms,
+        surface: SurfaceUniforms
+    ) {}
+
+    func encodeDebugMesh(
         into encoder: MTLRenderCommandEncoder,
         modelMatrix: simd_float4x4,
         scene: SceneUniforms,
