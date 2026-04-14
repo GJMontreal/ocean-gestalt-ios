@@ -161,6 +161,11 @@ final class OceanPass {
     ) {
         enc.setRenderPipelineState(wireframe ? oceanWirePipeline : oceanPipeline)
         enc.setDepthStencilState(solidDepthState)
+        // Solid surface: cull front faces so the ocean disappears when viewed from below.
+        // Metal's default front-face winding is CW; ocean triangles appear CCW from above
+        // (back-facing, not culled) and CW from below (front-facing, culled).
+        // Wireframe (line primitives) is unaffected by cull mode.
+        enc.setCullMode(wireframe ? .none : .front)
         enc.setVertexBuffer(oceanMesh.vertexBuffer, offset: 0, index: 0)
         var scn = scene
         var srf = surface
