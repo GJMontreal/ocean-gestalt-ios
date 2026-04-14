@@ -13,7 +13,7 @@
     "buoy_mesh.waterlineStrength": 0.45,
     "buoy_mesh.waterlineNoise": 0.8,
     "buoy_mesh.wetStrength": 0.5,
-    "mesh_shader.baseColor": [0.1, 0.2, 0.25, 1.0],
+    "mesh_shader.baseColor": [0.1, 0.1, 0.1, 1.0],
     "mesh_shader.causticIntensity": 1.0,
     "mesh_shader.causticColor": [
         1.0,
@@ -33,8 +33,8 @@
     "mesh_shader.depthFadeFar": 80.0,
     "mesh_shader.deepWaterTint": [
         0.1,
-        0.2,
-        0.3
+        0.1,
+        0.1
     ],
     "mesh_shader.fogColor": [
         0.4,
@@ -56,11 +56,11 @@
         0.27692896127700806,
         0.0
     ],
-    "mesh_shader.gust.scale": 0.009,
+    "mesh_shader.gust.scale": 0.9,
     "mesh_shader.gust.speed": 0.008,
-    "mesh_shader.gust.strength": 0.008,
-    "mesh_shader.normalMapping.scale": 1.0,
-    "mesh_shader.normalMapping.speed": 0.0,
+    "mesh_shader.gust.strength": 0.08,
+    "mesh_shader.normalMapping.scale": 0.010,
+    "mesh_shader.normalMapping.speed": 0.005,
     "mesh_shader.normalMapping.direction": [
         1.0,
         1.0,

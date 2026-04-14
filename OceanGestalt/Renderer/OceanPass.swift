@@ -46,7 +46,7 @@ final class OceanPass {
         // ---- Ocean-specific textures ----
         let loader = MTKTextureLoader(device: device)
         normalMapTex = try OceanPass.loadTexture(loader: loader,
-                                                  name: "NormalMap",
+                                                  name: "fbm_normalmap",
                                                   subdirectory: "data/textures",
                                                   sRGB: false)
         gustTex      = try OceanPass.loadTexture(loader: loader,

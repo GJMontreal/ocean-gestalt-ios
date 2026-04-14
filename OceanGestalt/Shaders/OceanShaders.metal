@@ -291,7 +291,7 @@ fragment float4 oceanFragment(
     float  planarWeight   = 1.0 - cosTheta;
     float3 combinedRefl   = mix(envRefl, planarRefl, planarWeight);
     float3 fresnel        = fresnelSchlick(cosTheta, surface.fresnelF0);
-    float3 reflection     = fresnel * combinedRefl * surface.reflectionStrength;
+    float3 reflection     = fresnel * combinedRefl;
 
     // Depth-based colour
     float  depth     = length(scene.cameraPos.xyz - in.fragPos);
@@ -306,9 +306,8 @@ fragment float4 oceanFragment(
     // Caustics
     float causticStr = smoothstep(surface.causticTroughMin, surface.causticTroughMax,
                                    -in.fragPos.y);
-    float2 flickUV1  = in.fragPos.xz * surface.causticScale + scene.time * surface.causticSpeed * float2( 1.0,  0.7);
-    float2 flickUV2  = in.fragPos.xz * surface.causticScale + scene.time * surface.causticSpeed * float2(-0.7,  1.0);
-    float  flicker   = clamp(fbmOcean(flickUV1) * fbmOcean(flickUV2) * 4.0, 0.0, 1.0);
+    float2 flickUV   = in.fragPos.xz * surface.causticScale + scene.time * surface.causticSpeed;
+    float  flicker   = fbmOcean(flickUV);
     flicker = smoothstep(surface.causticThresholdMin, surface.causticThresholdMax, flicker);
     float  NdotL     = max(dot(normalize(in.normal), normalize(scene.lightPos.xyz - in.fragPos)), 0.0f);
     flicker *= NdotL;
