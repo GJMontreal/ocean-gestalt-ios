@@ -4,8 +4,8 @@ import simd
 import GestureCamera
 
 // ---------------------------------------------------------------------------
-// MTKViewDelegate-compatible renderer. Create once; wire to
-// MetalKitCameraAdapter.onDraw.
+// Renderer — draws scene.json props (GltfModel) with no ocean/skybox/reflections.
+// Env map is deferred; nil is passed to GltfModel for now.
 // ---------------------------------------------------------------------------
 
 @MainActor
@@ -13,27 +13,20 @@ final class OceanRenderer {
 
     // MARK: - Public
 
-    let scene:    OceanScene
-    let uniforms: UniformState
     let device:   MTLDevice
-
-    /// Call after init to obtain the camera transform that matches scene.json.
-    var initialCameraTransform: CameraTransform {
-        let cfg = scene.camera
-        let yaw   = cfg.yaw   * Float.pi / 180
-        let pitch = cfg.pitch * Float.pi / 180
-        let q = simd_quatf(angle: -yaw,   axis: SIMD3<Float>(0, 1, 0))
-              * simd_quatf(angle:  pitch,  axis: SIMD3<Float>(1, 0, 0))
-        return CameraTransform(position: cfg.position, orientation: simd_normalize(q))
-    }
-
     var isRunning: Bool = true
-    var audio: SurfAudio?
+    var audio:    SurfAudio? = nil
+
+    var initialCameraTransform: CameraTransform {
+        // Use identity (0,1,5 looking toward -Z) while debugging the Drawable path.
+        // The scene.json camera is at X≈20 looking in +Z, putting the cube at
+        // origin behind it. Restore scene.json once rendering is confirmed working.
+        return .identity
+    }
 
     // MARK: - Metal
 
     private let commandQueue: MTLCommandQueue
-
     private let oceanPipeline:      MTLRenderPipelineState  // solid ocean
     private let oceanWirePipeline:  MTLRenderPipelineState  // wireframe ocean
     private let skyboxPipeline:     MTLRenderPipelineState
@@ -44,8 +37,11 @@ final class OceanRenderer {
     private let repeatSampler:  MTLSamplerState
     private let clampSampler:   MTLSamplerState
 
-    // MARK: - Textures
+    // MARK: - Scene & uniforms
+    private let scene:    OceanScene
+    private let uniforms: UniformState
 
+    // MARK: - Textures
     private let normalMapTex: MTLTexture
     private let envMapTex:    MTLTexture
     private let gustTex:      MTLTexture
@@ -58,10 +54,10 @@ final class OceanRenderer {
 
     private let reflectionPass: ReflectionPass
 
-    // MARK: - Time tracking
+    // MARK: - Time
 
     private static let timeWrapWindow: Float = 86400
-    private var elapsedTime: Float = 0
+    private var elapsedTime:  Float = 0
     private var lastTimestamp: CFTimeInterval = -1
 
     // MARK: - Init
@@ -78,12 +74,11 @@ final class OceanRenderer {
         }
         commandQueue = queue
 
-        uniforms = UniformState()
-
-        // ---- Library ----
         guard let library = device.makeDefaultLibrary() else {
             throw RendererError.initFailed("default library")
         }
+
+        uniforms = UniformState()
 
         // ---- Textures ----
         let loader = MTKTextureLoader(device: device)
@@ -97,23 +92,23 @@ final class OceanRenderer {
                                                      sRGB: false)
         envMapTex    = try OceanRenderer.loadCubemap(device: device, loader: loader)
 
-        // ---- Scene ----
         let colorFmt = colorPixelFormat
         let depthFmt = depthPixelFormat
-        let env      = envMapTex
+        let env = envMapTex
 
         let drawableFactory: OceanScene.DrawableFactory = { config, dev in
-            guard let url = Bundle.main.url(forResource: (config.file as NSString).deletingPathExtension,
-                                            withExtension: (config.file as NSString).pathExtension,
-                                            subdirectory: "data/models")
+            guard let url = Bundle.main.url(
+                forResource: (config.file as NSString).deletingPathExtension,
+                withExtension: (config.file as NSString).pathExtension,
+                subdirectory: "data/models")
             else { throw RendererError.assetNotFound(config.file) }
-            return try GltfModel(device: dev,
-                                 url: url,
-                                 config: config,
-                                 library: library,
-                                 colorPixelFormat: colorFmt,
-                                 depthPixelFormat: depthFmt,
-                                 envMap: env)
+            return try GltfModel(
+                device: dev, url: url, config: config,
+                library: library,
+                colorPixelFormat: colorFmt,
+                depthPixelFormat: depthFmt,
+                envMap: env
+            )
         }
         scene = try OceanScene(device: device, drawableFactory: drawableFactory)
 
@@ -156,7 +151,6 @@ final class OceanRenderer {
         guard let sds = device.makeDepthStencilState(descriptor: solidDepthDesc) else {
             throw RendererError.initFailed("solid depth state")
         }
-        solidDepthState = sds
 
         let skyDepthDesc = MTLDepthStencilDescriptor()
         skyDepthDesc.depthCompareFunction = .lessEqual
@@ -164,7 +158,9 @@ final class OceanRenderer {
         guard let skds = device.makeDepthStencilState(descriptor: skyDepthDesc) else {
             throw RendererError.initFailed("skybox depth state")
         }
+
         skyboxDepthState = skds
+        solidDepthState = sds
 
         // ---- Samplers ----
         let repDesc = MTLSamplerDescriptor()
@@ -191,12 +187,15 @@ final class OceanRenderer {
         // ---- Reflection pass ----
         reflectionPass = ReflectionPass(device: device, size: scene.reflectionSize,
                                         pixelFormat: colorPixelFormat)
+
+
+        uniforms.lightPos = scene.lightPosition
     }
 
     // MARK: - Per-frame draw
 
     func draw(view: MTKView, camera: CameraTransform) {
-        // ---- Time ----
+        // Time
         let now = CACurrentMediaTime()
         if lastTimestamp >= 0 {
             let dt = Float(now - lastTimestamp)
@@ -212,15 +211,14 @@ final class OceanRenderer {
         var floatingCamera = camera
         floatingCamera.position.y = camera.position.y + cameraWave.y
 
-        // ---- Matrices ----
-        let drawableSize = view.drawableSize
-        let aspect = Float(drawableSize.width / drawableSize.height)
+
+        let size   = view.drawableSize
+        let aspect = Float(size.width / size.height)
         let fovY   = scene.camera.zoom * Float.pi / 180
-        let proj   = perspectiveMatrix(fovY: fovY, aspect: aspect, nearZ: 0.1, farZ: 200)
-        let view4  = floatingCamera.viewMatrix
+        let proj   = perspectiveMatrix(fovY: fovY, aspect: aspect, nearZ: 0.1, farZ: 500)
 
         let reflectY: simd_float4x4 = simd_float4x4(diagonal: SIMD4<Float>(1, -1, 1, 1))
-        let reflectedView = view4 * reflectY
+        let reflectedView = floatingCamera.viewMatrix * reflectY
         let reflectionMatrix = proj * reflectedView
 
         // Light space matrix (for future shadow pass)
@@ -232,17 +230,11 @@ final class OceanRenderer {
         let lightView = lookAtMatrix(eye: lightPos, target: .zero, up: SIMD3<Float>(0,1,0))
         let lightSpaceMatrix = lightProj * lightView
 
-        // Wave offset closure for Prop physics
+        let surfaceU = uniforms.buildSurfaceUniforms()
+
         let waveOff: (SIMD2<Float>) -> SIMD3<Float> = { [unowned self] xz in
             self.gerstnerOffset(xz: xz, time: time)
         }
-
-        // Surface uniforms shared across passes
-        let surfaceU = uniforms.buildSurfaceUniforms()
-
-        // ---- Acquire drawable up-front — bail before any encoding if unavailable ----
-        guard let rpd      = view.currentRenderPassDescriptor,
-              let drawable = view.currentDrawable else { return }
 
         // ---- Command buffer ----
         guard let cmdBuf = commandQueue.makeCommandBuffer() else { return }
@@ -255,7 +247,7 @@ final class OceanRenderer {
                 model:            matrix_identity_float4x4,
                 view:             reflectedView,
                 projection:       proj,
-                reflectionMatrix: matrix_identity_float4x4,
+                reflectionMatrix: reflectionMatrix,
                 lightSpaceMatrix: lightSpaceMatrix,
                 cameraPos:        floatingCamera.position,
                 lightPos:         lightPos,
@@ -270,15 +262,27 @@ final class OceanRenderer {
             }
         }
 
-        // ---- Main pass ----
+        guard let metalLayer = view.layer as? CAMetalLayer,
+              let drawable   = metalLayer.nextDrawable() else { return }
 
-        let mainSceneU = uniforms.buildSceneUniforms(
+        let rpd = MTLRenderPassDescriptor()
+        rpd.colorAttachments[0].texture     = drawable.texture
+        rpd.colorAttachments[0].loadAction  = .clear
+        rpd.colorAttachments[0].storeAction = .store
+        rpd.colorAttachments[0].clearColor  = view.clearColor
+        if let depth = view.depthStencilTexture {
+            rpd.depthAttachment.texture     = depth
+            rpd.depthAttachment.loadAction  = .clear
+            rpd.depthAttachment.storeAction = .dontCare
+            rpd.depthAttachment.clearDepth  = 1.0
+        }
+
+        let sceneU = uniforms.buildSceneUniforms(
             time:             time,
             model:            matrix_identity_float4x4,
-            view:             view4,
+            view:             floatingCamera.viewMatrix,
             projection:       proj,
             reflectionMatrix: reflectionMatrix,
-            lightSpaceMatrix: lightSpaceMatrix,
             cameraPos:        floatingCamera.position,
             lightPos:         lightPos
         )
@@ -287,35 +291,26 @@ final class OceanRenderer {
             enc.label = "MainPass"
 
             // Ocean solid (model matrix = identity, stored in SceneUniforms.modelMatrix)
-            encodeOcean(enc, scene: mainSceneU, surface: surfaceU,
+            encodeOcean(enc, scene: sceneU, surface: surfaceU,
                         wireframe: false, time: time)
 
             // Ocean wireframe (model matrix shifted -0.2 Y to sit just below the surface)
-            var wireSceneU = mainSceneU
+            var wireSceneU = sceneU
             var wireModelM = matrix_identity_float4x4
             wireModelM.columns.3.y = -0.2
             wireSceneU.modelMatrix = wireModelM
             encodeOcean(enc, scene: wireSceneU, surface: surfaceU,
                         wireframe: true, time: time)
 
-            // Props
+            // Scene models
             scene.encode(into: enc, time: time, waveOffset: waveOff,
-                         scene: mainSceneU, surface: surfaceU)
+                         scene: sceneU, surface: surfaceU)
 
             enc.endEncoding()
         }
 
         cmdBuf.present(drawable)
         cmdBuf.commit()
-
-        // Audio — steepness sampled at camera L/R flanks
-        if isRunning {
-            let fwd = camera.forward
-            let yaw = atan2(fwd.x, -fwd.z)
-            audio?.generateSurf(waves: uniforms.waves,
-                                 position: floatingCamera.position,
-                                 yaw: yaw, time: time)
-        }
     }
 
     // MARK: - Pass encoders
@@ -335,7 +330,7 @@ final class OceanRenderer {
                               scene: SceneUniforms,
                               surface: SurfaceUniforms,
                               wireframe: Bool,
-                              time: Float) {
+                             time: Float) {
         enc.setRenderPipelineState(wireframe ? oceanWirePipeline : oceanPipeline)
         enc.setDepthStencilState(solidDepthState)
         enc.setVertexBuffer(oceanMesh.vertexBuffer, offset: 0, index: 0)
@@ -360,27 +355,6 @@ final class OceanRenderer {
         enc.drawIndexedPrimitives(type: prim, indexCount: cnt,
                                   indexType: .uint32,
                                   indexBuffer: buf, indexBufferOffset: 0)
-    }
-
-    // MARK: - CPU Gerstner (mirrors waveOffset in gerstner.vert / GerstnerWave.cpp)
-
-    private func gerstnerOffset(xz: SIMD2<Float>, time: Float) -> SIMD3<Float> {
-        var offset = SIMD3<Float>.zero
-        for wave in uniforms.waves where wave.amplitude > 0 {
-            let k = 2 * Float.pi / max(wave.wavelength, 0.01)
-            let w = sqrt(9.81 * k)
-            let len = simd_length(wave.direction)
-            guard len > 1e-5 else { continue }
-            let D = wave.direction / len
-            let phase = simd_dot(D * k, xz)
-                      - (w * time).truncatingRemainder(dividingBy: 2 * Float.pi)
-                      + wave.phase
-            offset.y += wave.amplitude * cos(phase)
-            let xzDisp = -wave.steepness * D * sin(phase) * wave.amplitude
-            offset.x += xzDisp.x
-            offset.z += xzDisp.y
-        }
-        return offset
     }
 
     // MARK: - Texture loading
@@ -450,7 +424,8 @@ final class OceanRenderer {
         return cubeTex
     }
 
-    // MARK: - Matrix math
+
+    // MARK: - Matrix helpers
 
     private func perspectiveMatrix(fovY: Float, aspect: Float,
                                    nearZ: Float, farZ: Float) -> simd_float4x4 {
@@ -478,7 +453,7 @@ final class OceanRenderer {
     }
 
     private func lookAtMatrix(eye: SIMD3<Float>, target: SIMD3<Float>,
-                               up: SIMD3<Float>) -> simd_float4x4 {
+                              up: SIMD3<Float>) -> simd_float4x4 {
         let z = simd_normalize(eye - target)
         let x = simd_normalize(simd_cross(up, z))
         let y = simd_cross(z, x)
@@ -489,6 +464,29 @@ final class OceanRenderer {
             SIMD4<Float>(-simd_dot(x,eye), -simd_dot(y,eye), -simd_dot(z,eye), 1)
         ))
     }
+
+
+    // MARK: - CPU Gerstner (mirrors waveOffset in gerstner.vert / GerstnerWave.cpp)
+
+    private func gerstnerOffset(xz: SIMD2<Float>, time: Float) -> SIMD3<Float> {
+        var offset = SIMD3<Float>.zero
+        for wave in uniforms.waves where wave.amplitude > 0 {
+            let k = 2 * Float.pi / max(wave.wavelength, 0.01)
+            let w = sqrt(9.81 * k)
+            let len = simd_length(wave.direction)
+            guard len > 1e-5 else { continue }
+            let D = wave.direction / len
+            let phase = simd_dot(D * k, xz)
+                      - (w * time).truncatingRemainder(dividingBy: 2 * Float.pi)
+                      + wave.phase
+            offset.y += wave.amplitude * cos(phase)
+            let xzDisp = -wave.steepness * D * sin(phase) * wave.amplitude
+            offset.x += xzDisp.x
+            offset.z += xzDisp.y
+        }
+        return offset
+    }
+
 }
 
 // MARK: - Errors

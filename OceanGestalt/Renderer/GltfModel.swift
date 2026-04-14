@@ -6,8 +6,8 @@ import simd
 /// Drawable backed by a GLTF/GLB file. Loads via ModelIO, uploads to Metal
 /// buffers, and performs the two-pass waterline draw (solid above / wireframe
 /// below) matching the C++ normal_bump.frag / GltfModel.cpp behaviour.
-@MainActor
-final class GltfModel: Drawable {
+//@MainActor
+final class GltfModel: @MainActor Drawable {
 
     // MARK: - Types
 
@@ -134,6 +134,7 @@ final class GltfModel: Drawable {
         }
         sampler = samp
 
+        print("canImport glb %b", MDLAsset.canImportFileExtension("glb"))
         // ---- Load GLB ----
         let bufferAllocator = MTKMeshBufferAllocator(device: device)
         let asset = MDLAsset(url: url,
@@ -142,6 +143,12 @@ final class GltfModel: Drawable {
         asset.loadTextures()
 
         let (mdlMeshes, mtkMeshes) = try MTKMesh.newMeshes(asset: asset, device: device)
+
+        // ---- Fallback 1×1 textures (used when a GLB has no embedded texture) ----
+        // Flat normal (0.5,0.5,1.0) → decodes to tangent-space (0,0,1); white albedo; mid roughness.
+        let fbColor  = GltfModel.make1x1(device: device, rgba: (255, 255, 255, 255))
+        let fbNormal = GltfModel.make1x1(device: device, rgba: (127, 127, 255, 255))
+        let fbMR     = GltfModel.make1x1(device: device, rgba: (0,   128,   0, 255))
 
         // ---- Materials ----
         let textureLoader = MTKTextureLoader(device: device)
@@ -158,6 +165,11 @@ final class GltfModel: Drawable {
                     mat.mrTex     = GltfModel.loadTexture(from: mdlMat, semantic: .roughness,
                                                           loader: textureLoader, sRGB: false)
                 }
+                // Fall back to 1×1 defaults so the shader never samples an unbound slot
+                mat.colorTex  = mat.colorTex  ?? fbColor
+                mat.normalTex = mat.normalTex ?? fbNormal
+                mat.mrTex     = mat.mrTex     ?? fbMR
+                print("[GltfModel] \(config.name) submesh — color:\(mat.colorTex != nil) normal:\(mat.normalTex != nil) mr:\(mat.mrTex != nil)")
                 loadedMaterials.append(mat)
             }
         }
@@ -187,6 +199,7 @@ final class GltfModel: Drawable {
 
         primitives = loadedPrimitives
         materials  = loadedMaterials
+        print("[GltfModel] \(config.name) — \(loadedPrimitives.count) primitives, \(loadedMaterials.count) materials")
 
         // ---- Per-model config overrides ----
         if let w = config.waterlineWidth { waterlineWidth = w }
@@ -194,7 +207,7 @@ final class GltfModel: Drawable {
 
     // MARK: - Drawable
 
-    func encode(
+    nonisolated func encode(
         into encoder: MTLRenderCommandEncoder,
         modelMatrix: simd_float4x4,
         scene: SceneUniforms,
@@ -203,8 +216,8 @@ final class GltfModel: Drawable {
         encodePasses(into: encoder, modelMatrix: modelMatrix, scene: scene,
                      isReflection: false)
     }
-
-    func encodeReflection(
+    
+    nonisolated func encodeReflection(
         into encoder: MTLRenderCommandEncoder,
         modelMatrix: simd_float4x4,
         scene: SceneUniforms,
@@ -339,6 +352,22 @@ final class GltfModel: Drawable {
                                     length: lineIdxs.count * MemoryLayout<UInt32>.size,
                                     options: .storageModeShared)!
         return (buf, lineIdxs.count)
+    }
+
+    /// Creates a 1×1 RGBA8 texture with the given byte values.
+    /// Used as a fallback when a GLB has no embedded texture for a given semantic.
+    private static func make1x1(device: MTLDevice,
+                                rgba: (UInt8, UInt8, UInt8, UInt8)) -> MTLTexture? {
+        let desc = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .rgba8Unorm, width: 1, height: 1, mipmapped: false)
+        desc.storageMode = .shared
+        guard let tex = device.makeTexture(descriptor: desc) else { return nil }
+        var pixel = [rgba.0, rgba.1, rgba.2, rgba.3]
+        tex.replace(region: MTLRegionMake2D(0, 0, 1, 1),
+                    mipmapLevel: 0,
+                    withBytes: &pixel,
+                    bytesPerRow: 4)
+        return tex
     }
 }
 

@@ -70,6 +70,35 @@ struct SurfaceUniforms {
 };
 
 // ---------------------------------------------------------------------------
+// Debug cube — unit cube at origin.
+// Uses the same buffer bindings as GltfModel: SceneUniforms at 1, model matrix at 2.
+// ---------------------------------------------------------------------------
+
+struct CubeVertOut {
+    float4 position [[position]];
+    float3 localPos;
+};
+
+vertex CubeVertOut cubeVertex(
+    uint                    vertexID    [[vertex_id]],
+    constant float4*        positions   [[buffer(0)]],
+    constant SceneUniforms& scene       [[buffer(1)]],
+    constant float4x4&      modelMatrix [[buffer(2)]])
+{
+    float3 p   = positions[vertexID].xyz;
+    float4x4 mvp = scene.projectionMatrix * scene.viewMatrix * modelMatrix;
+    CubeVertOut out;
+    out.position = mvp * float4(p, 1.0);
+    out.localPos = p;
+    return out;
+}
+
+fragment float4 cubeFragment(CubeVertOut in [[stage_in]])
+{
+    return float4(in.localPos + 0.5, 1.0);
+}
+
+// ---------------------------------------------------------------------------
 // Ocean vertex input
 // Layout: packed float3 position (12) + float2 texCoord (8) = stride 20
 // ---------------------------------------------------------------------------
