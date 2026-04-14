@@ -202,19 +202,22 @@ vertex OceanVertexOut oceanVertex(
                              surface.normalMappingSpeed, surface.normalMappingScale, scene.time);
 
     float3 newPos = displacedPos(base, scene.waves, scene.numWaves, scene.time);
-    float  gust   = gustDisplacement(gustUV, gustTex, samp, surface.gustStrength);
-    newPos.y += gust;
 
-    // Finite-difference surface normal (matching calcNormal in gerstner.vert)
+    // Finite-difference normals from Gerstner only. Gust must not be included
+    // here: its UV delta would need to be eps*gustScale in texture space, but
+    // eps is a world-space value — using it directly as a UV offset is 111×
+    // too large, causing fract() discontinuities that corrupt the normal.
     const float eps = 0.01;
     float3 posX = displacedPos(base + float3(eps, 0, 0), scene.waves, scene.numWaves, scene.time);
-    posX.y += gustDisplacement(gustUV + float2(eps, 0), gustTex, samp, surface.gustStrength);
     float3 posZ = displacedPos(base + float3(0, 0, eps), scene.waves, scene.numWaves, scene.time);
-    posZ.y += gustDisplacement(gustUV + float2(0, eps), gustTex, samp, surface.gustStrength);
 
     float3 tangent   = posX - newPos;
     float3 bitangent = posZ - newPos;
     float3 normal    = normalize(cross(bitangent, tangent));
+
+    // Gust applied after normals — it's a gentle vertical offset, not a surface deformation.
+    float  gust   = gustDisplacement(gustUV, gustTex, samp, surface.gustStrength);
+    newPos.y += gust;
 
     float4 worldPos = scene.modelMatrix * float4(newPos, 1.0);
 
