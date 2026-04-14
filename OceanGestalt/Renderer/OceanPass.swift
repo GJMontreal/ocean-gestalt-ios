@@ -185,27 +185,13 @@ final class OceanPass {
                                   indexBuffer: buf, indexBufferOffset: 0)
     }
 
-    // Mirrors NormalsUniforms in OceanShaders.metal — must stay in sync.
-    private struct NormalsUniforms {
-        var gridWidth: UInt32
-        var stride:    UInt32
-        var _pad:      SIMD2<Float> = .zero
-    }
-
     private func encodeNormals(_ enc: MTLRenderCommandEncoder, scene: SceneUniforms) {
-        let stride: UInt32 = 8
-        let gw: UInt32     = UInt32(oceanMesh.gridWidth)
-        let samplesPerRow  = (gw + stride - 1) / stride
-        var normUni        = NormalsUniforms(gridWidth: gw, stride: stride)
-        let sampleCount    = Int(samplesPerRow) * Int(samplesPerRow)
-
         enc.setRenderPipelineState(normalsPipeline)
         enc.setDepthStencilState(solidDepthState)
         enc.setVertexBuffer(oceanMesh.vertexBuffer, offset: 0, index: 0)
         var scn = scene
-        enc.setVertexBytes(&scn,     length: MemoryLayout<SceneUniforms>.size,   index: 1)
-        enc.setVertexBytes(&normUni, length: MemoryLayout<NormalsUniforms>.size, index: 2)
-        enc.drawPrimitives(type: .line, vertexStart: 0, vertexCount: sampleCount * 2)
+        enc.setVertexBytes(&scn, length: MemoryLayout<SceneUniforms>.size, index: 1)
+        enc.drawPrimitives(type: .line, vertexStart: 0, vertexCount: oceanMesh.vertexCount * 2)
     }
 
     // MARK: - Texture loading

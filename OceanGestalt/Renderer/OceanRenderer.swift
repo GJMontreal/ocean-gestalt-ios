@@ -197,8 +197,6 @@ final class OceanRenderer {
         if let enc = cmdBuf.makeRenderCommandEncoder(descriptor: rpd) {
             enc.label = "MainPass"
 
-            skyboxPass.encode(into: enc, scene: sceneU)
-
             oceanPass.encode(into: enc, scene: sceneU, surface: surfaceU,
                              showMesh: showMesh, showNormals: showNormals, time: time)
 
