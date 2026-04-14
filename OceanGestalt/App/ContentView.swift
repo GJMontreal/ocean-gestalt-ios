@@ -18,7 +18,10 @@ struct ContentView: View {
                 MetalView(engine: engine)
                     .ignoresSafeArea()
 
-                // 2 — Single-finger drag → camera rotation.
+                // 2 — Lens drop overlay (non-interactive)
+                LensDropsView()
+
+                // 3 — Single-finger drag → camera rotation.
                 //     minimumDistance: 0 so a bare tap also calls touchDetected().
                 //     Rotation is only applied when the delta is meaningful.
                 Rectangle()
@@ -41,7 +44,7 @@ struct ContentView: View {
                     )
                     .ignoresSafeArea()
 
-                // 3 — WASD d-pad + vertical + motion toggle (from GestureCamera).
+                // 4 — WASD d-pad + vertical + motion toggle (from GestureCamera).
                 //     simultaneousGesture resets the hide timer while the WASD
                 //     buttons are being used without disrupting their own gestures.
                 WASDOverlayView(controller: camera)
@@ -53,7 +56,7 @@ struct ContentView: View {
                             .onChanged { _ in touchDetected() }
                     )
 
-                // 4 — Pause / mute: left side, same row as the motion toggle (20pt top)
+                // 5 — Pause / mute: left side, same row as the motion toggle (20pt top)
                 HStack(spacing: 8) {
                     controlButton(
                         systemImage: engine.isRunning ? "pause.fill" : "play.fill",
