@@ -190,6 +190,9 @@ final class OceanRenderer {
 
 
         uniforms.lightPos = scene.lightPosition
+
+        audio = SurfAudio()
+        audio?.start()
     }
 
     // MARK: - Per-frame draw
@@ -204,6 +207,9 @@ final class OceanRenderer {
         lastTimestamp = now
         let time = elapsedTime.truncatingRemainder(dividingBy: OceanRenderer.timeWrapWindow)
         uniforms.tick(time: time)
+
+        let yaw = atan2(camera.forward.x, camera.forward.z)
+        audio?.generateSurf(waves: uniforms.waves, position: camera.position, yaw: yaw, time: time)
 
         // ---- Camera wave floating ----
         let cameraXZ = SIMD2<Float>(camera.position.x, camera.position.z)

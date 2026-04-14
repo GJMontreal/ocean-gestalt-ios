@@ -28,7 +28,7 @@
     "mesh_shader.causticThresholdMax": 0.8,
     "mesh_shader.causticSharpness": 6.0,
     "mesh_shader.reflectionDistortion": 0.03,
-    "mesh_shader.reflectionStrength": 0.6,
+    "mesh_shader.reflectionStrength": 0.35,
     "mesh_shader.depthFadeNear": 10.0,
     "mesh_shader.depthFadeFar": 80.0,
     "mesh_shader.deepWaterTint": [
