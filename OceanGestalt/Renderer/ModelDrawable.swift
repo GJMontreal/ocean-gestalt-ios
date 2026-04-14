@@ -50,7 +50,7 @@ final class ModelDrawable: @MainActor Drawable {
     var waterlineStrength: Float  = 0.45
     var waterlineNoise: Float     = 0.8
     var wetStrength: Float        = 0.5
-    var specularFactor: Float     = 1.0
+    var specularFactor: Float     = 0.3
     var bumpFactor: Float         = 0.5
     var wireframeColor: SIMD4<Float> = SIMD4<Float>(0, 0.45, 0.65, 1)
 

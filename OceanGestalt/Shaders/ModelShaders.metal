@@ -196,7 +196,7 @@ fragment float4 modelFragment(
 
     float diff    = max(dot(normal, lightDir), 0.0f);
     float roughness = mrMap.sample(samp, in.texCoord).g;
-    float shininess = pow(1.0 - roughness, 2.0);
+    float shininess = pow(1.0 - roughness, 4.0);
 
     float3 ambient  = 0.2  * albedo;
     float3 diffuse  = 0.6  * diff * albedo;
