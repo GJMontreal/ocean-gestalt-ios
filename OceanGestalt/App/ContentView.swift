@@ -40,8 +40,8 @@ struct ContentView: View {
                 WASDOverlayView(controller: camera)
                     .ignoresSafeArea()
 
-                // 4 — Pause / mute: right column below the motion toggle (52pt + 20pt top + 8pt gap)
-                VStack(spacing: 8) {
+                // 4 — Pause / mute: left side, same row as the motion toggle (20pt top)
+                HStack(spacing: 8) {
                     controlButton(
                         systemImage: engine.isRunning ? "pause.fill" : "play.fill",
                         action: { engine.togglePause() }
@@ -51,9 +51,9 @@ struct ContentView: View {
                         action: { engine.toggleMute() }
                     )
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                .padding(.top, 80)
-                .padding(.trailing, 20)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .padding(.top, 20)
+                .padding(.leading, 20)
             }
             .background(Color.black)
         }
