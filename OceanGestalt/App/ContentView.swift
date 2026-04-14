@@ -151,6 +151,7 @@ final class OceanEngine: ObservableObject {
                     return false
                 }
             }
+            cam.isMotionTranslationEnabled = false
             camera = cam
         } catch {
             print("OceanEngine: init failed — \(error)")

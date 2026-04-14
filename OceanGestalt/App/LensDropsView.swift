@@ -94,7 +94,7 @@ struct LensDropsView: View {
         guard date.timeIntervalSince(lastSpawn) >= 1.0 / spawnRate else { return }
         lastSpawn = date
         let startY   = 0.05 + pow(Double.random(in: 0...1), 0.5) * 0.85
-        let duration = Double.random(in: 4.0...9.0)
+        let duration = Double.random(in: 0.5...3.0)
         drops.append(LensDrop(
             x:           Double.random(in: 0.05...0.95),
             startY:      startY,

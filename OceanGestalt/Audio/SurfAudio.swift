@@ -14,7 +14,7 @@ final class SurfAudio {
 
     private static let sampleRate: Double      = 44100
     private static let horizontalOffset: Float = 10
-    private static let surfGain:   Float       = 0.4
+    private static let surfGain:   Float       = 0.2
     private static let sizzleGain: Float       = 0.35
 
     // Steepness values written on main thread, read on audio thread
