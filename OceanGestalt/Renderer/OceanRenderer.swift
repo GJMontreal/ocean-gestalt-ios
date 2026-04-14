@@ -88,6 +88,7 @@ final class OceanRenderer {
             depthPixelFormat: depthPixelFormat,
             meshConfig: scene.mesh,
             reflectionSize: scene.reflectionSize,
+            shadowSize: scene.shadowSize,
             envMap: envMap
         )
 
@@ -156,6 +157,22 @@ final class OceanRenderer {
 
         guard let cmdBuf = commandQueue.makeCommandBuffer() else { return }
         cmdBuf.label = "OceanFrame"
+
+        // ---- Shadow pre-pass ----
+        if let shadowRPD = oceanPass.shadowPassDescriptor {
+            let shadowSceneU = uniforms.buildSceneUniforms(
+                time: time, model: matrix_identity_float4x4,
+                view: lightView, projection: lightProj,
+                reflectionMatrix: reflectionMatrix,
+                lightSpaceMatrix: lightSpaceMatrix,
+                cameraPos: floatingCamera.position, lightPos: lightPos
+            )
+            if let enc = cmdBuf.makeRenderCommandEncoder(descriptor: shadowRPD) {
+                enc.label = "ShadowPass"
+                oceanPass.encodeShadow(into: enc, scene: shadowSceneU, surface: surfaceU)
+                enc.endEncoding()
+            }
+        }
 
         // ---- Reflection pre-pass ----
         if let reflRPD = oceanPass.reflectionPassDescriptor {

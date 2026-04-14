@@ -21,14 +21,20 @@ final class OceanPass {
 
     private let oceanPipeline:     MTLRenderPipelineState
     private let oceanWirePipeline: MTLRenderPipelineState
+    private let shadowPipeline:    MTLRenderPipelineState
     private let normalsPipeline:   MTLRenderPipelineState
     private let solidDepthState:   MTLDepthStencilState
+    private let shadowDepthState:  MTLDepthStencilState
     private let repeatSampler:     MTLSamplerState
+    private let shadowSampler:     MTLSamplerState
     private let normalMapTex:      MTLTexture
     private let gustTex:           MTLTexture
     private let envMapTex:         MTLTexture
     private let oceanMesh:         OceanMeshBuffers
     private let reflectionPass:    ReflectionPass
+    private let shadowPass:        ShadowPass
+
+    var shadowPassDescriptor: MTLRenderPassDescriptor? { shadowPass.passDescriptor }
 
     // MARK: - Init
 
@@ -39,6 +45,7 @@ final class OceanPass {
         depthPixelFormat: MTLPixelFormat,
         meshConfig: MeshConfig,
         reflectionSize: Int,
+        shadowSize: Int,
         envMap: MTLTexture
     ) throws {
         self.envMapTex = envMap
@@ -108,7 +115,15 @@ final class OceanPass {
         normDesc.fragmentFunction = library.makeFunction(name: "normalsFragment")
         normalsPipeline = try device.makeRenderPipelineState(descriptor: normDesc)
 
-        // ---- Depth state ----
+        // ---- Shadow depth-only pipeline ----
+        let shadowDesc = MTLRenderPipelineDescriptor()
+        shadowDesc.vertexDescriptor         = MeshBuilder.oceanVertexDescriptor
+        shadowDesc.depthAttachmentPixelFormat = .depth32Float
+        shadowDesc.vertexFunction           = library.makeFunction(name: "oceanShadowVertex")
+        shadowDesc.fragmentFunction         = nil   // depth-only; no colour write
+        shadowPipeline = try device.makeRenderPipelineState(descriptor: shadowDesc)
+
+        // ---- Depth states ----
         let depthDesc = MTLDepthStencilDescriptor()
         depthDesc.depthCompareFunction = .less
         depthDesc.isDepthWriteEnabled  = true
@@ -117,9 +132,31 @@ final class OceanPass {
         }
         solidDepthState = ds
 
+        let shadowDepthDesc = MTLDepthStencilDescriptor()
+        shadowDepthDesc.depthCompareFunction = .less
+        shadowDepthDesc.isDepthWriteEnabled  = true
+        guard let sds = device.makeDepthStencilState(descriptor: shadowDepthDesc) else {
+            throw OceanPassError.initFailed("shadow depth state")
+        }
+        shadowDepthState = sds
+
+        // ---- Shadow sampler — nearest/clamp for manual PCF ----
+        let shadowSampDesc = MTLSamplerDescriptor()
+        shadowSampDesc.sAddressMode = .clampToEdge
+        shadowSampDesc.tAddressMode = .clampToEdge
+        shadowSampDesc.minFilter    = .nearest
+        shadowSampDesc.magFilter    = .nearest
+        guard let ss = device.makeSamplerState(descriptor: shadowSampDesc) else {
+            throw OceanPassError.initFailed("shadow sampler")
+        }
+        shadowSampler = ss
+
         // ---- Reflection pass ----
         reflectionPass = ReflectionPass(device: device, size: reflectionSize,
                                         pixelFormat: colorPixelFormat)
+
+        // ---- Shadow pass ----
+        shadowPass = ShadowPass(device: device, size: shadowSize)
     }
 
     // MARK: - Encode
@@ -148,6 +185,29 @@ final class OceanPass {
         if showNormals {
             encodeNormals(encoder, scene: scene)
         }
+    }
+
+    /// Shadow pre-pass encode: renders the ocean from the light's POV into the
+    /// depth texture so the main pass can do PCF shadow lookups.
+    func encodeShadow(
+        into encoder: MTLRenderCommandEncoder,
+        scene: SceneUniforms,
+        surface: SurfaceUniforms
+    ) {
+        encoder.setRenderPipelineState(shadowPipeline)
+        encoder.setDepthStencilState(shadowDepthState)
+        encoder.setCullMode(.back)
+        encoder.setVertexBuffer(oceanMesh.vertexBuffer, offset: 0, index: 0)
+        var scn = scene
+        var srf = surface
+        encoder.setVertexBytes(&scn, length: MemoryLayout<SceneUniforms>.size,   index: 1)
+        encoder.setVertexBytes(&srf, length: MemoryLayout<SurfaceUniforms>.size, index: 2)
+        encoder.setVertexTexture(gustTex, index: 0)
+        encoder.setVertexSamplerState(repeatSampler, index: 0)
+        encoder.drawIndexedPrimitives(type: .triangle, indexCount: oceanMesh.indexCount,
+                                      indexType: .uint32,
+                                      indexBuffer: oceanMesh.indexBuffer,
+                                      indexBufferOffset: 0)
     }
 
     // MARK: - Private encode helpers
@@ -179,8 +239,10 @@ final class OceanPass {
             enc.setFragmentTexture(normalMapTex,                    index: 0)
             enc.setFragmentTexture(envMapTex,                       index: 1)
             enc.setFragmentTexture(reflectionPass.colorTexture,     index: 2)
+            enc.setFragmentTexture(shadowPass.depthTexture,         index: 3)
             enc.setFragmentSamplerState(repeatSampler, index: 0)
             enc.setFragmentSamplerState(clampSampler,  index: 1)
+            enc.setFragmentSamplerState(shadowSampler, index: 2)
         }
         let buf  = wireframe ? oceanMesh.wirelineBuffer : oceanMesh.indexBuffer
         let cnt  = wireframe ? oceanMesh.wirelineCount  : oceanMesh.indexCount

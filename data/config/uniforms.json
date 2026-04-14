@@ -30,7 +30,7 @@
     "mesh_shader.reflectionDistortion": 0.03,
     "mesh_shader.reflectionStrength": 0.35,
     "mesh_shader.depthFadeNear": 10.0,
-    "mesh_shader.depthFadeFar": 80.0,
+    "mesh_shader.depthFadeFar": 20.0,
     "mesh_shader.deepWaterTint": [
         0.1,
         0.1,
@@ -59,7 +59,7 @@
     "mesh_shader.gust.scale": 0.9,
     "mesh_shader.gust.speed": 0.008,
     "mesh_shader.gust.strength": 0.08,
-    "mesh_shader.normalMapping.scale": 0.010,
+    "mesh_shader.normalMapping.scale": 1.0,
     "mesh_shader.normalMapping.speed": 0.005,
     "mesh_shader.normalMapping.direction": [
         1.0,

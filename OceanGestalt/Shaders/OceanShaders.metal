@@ -184,6 +184,28 @@ float fbmOcean(float2 p) {
 }
 
 // ---------------------------------------------------------------------------
+// Shadow depth vertex shader — same displacement as oceanVertex, but outputs
+// into light clip space.  No fragment function needed; depth writes happen
+// during rasterisation.
+// ---------------------------------------------------------------------------
+
+vertex float4 oceanShadowVertex(
+    OceanVertexIn             in      [[stage_in]],
+    constant SceneUniforms&   scene   [[buffer(1)]],
+    constant SurfaceUniforms& surface [[buffer(2)]],
+    texture2d<float>          gustTex [[texture(0)]],
+    sampler                   samp    [[sampler(0)]])
+{
+    float3 base   = in.position;
+    float3 newPos = displacedPos(base, scene.waves, scene.numWaves, scene.time);
+    float2 gustUV = calcUV(base, surface.gustDirection,
+                           surface.gustSpeed, surface.gustScale, scene.time);
+    newPos.y += gustDisplacement(gustUV, gustTex, samp, surface.gustStrength);
+    float4 worldPos = scene.modelMatrix * float4(newPos, 1.0);
+    return scene.lightSpaceMatrix * worldPos;
+}
+
+// ---------------------------------------------------------------------------
 // Ocean vertex shader
 // ---------------------------------------------------------------------------
 
@@ -242,6 +264,40 @@ fragment float4 wireframeFragment(OceanVertexOut in [[stage_in]],
 }
 
 // ---------------------------------------------------------------------------
+// Shadow PCF — port of shadowPCF() in water.frag.
+// Metal NDC z is already in [0,1] (no *0.5+0.5 needed for z).
+// y is flipped relative to texture v: NDC +1 = top, UV v=0 = top.
+// ---------------------------------------------------------------------------
+
+float shadowPCF(float3 fragPos, float3 normal, float3 lightDir,
+                depth2d<float>          shadowMap,
+                sampler                 shadowSamp,
+                constant SceneUniforms& scene)
+{
+    float4 fragLS     = scene.lightSpaceMatrix * float4(fragPos, 1.0);
+    float3 proj       = fragLS.xyz / fragLS.w;
+
+    if (proj.z > 1.0) return 1.0;
+
+    float2 shadowUV   = proj.xy * float2(0.5, -0.5) + 0.5;
+    if (any(shadowUV < 0.0) || any(shadowUV > 1.0)) return 1.0;
+
+    float bias         = max(0.05 * (1.0 - dot(normal, lightDir)), 0.005);
+    float currentDepth = proj.z - bias;
+
+    float2 texelSize   = 1.0 / float2(shadowMap.get_width(), shadowMap.get_height());
+    float  shadow      = 0.0;
+    for (int x = -1; x <= 1; ++x) {
+        for (int y = -1; y <= 1; ++y) {
+            float pcfDepth = shadowMap.sample(shadowSamp,
+                                              shadowUV + float2(x, y) * texelSize);
+            shadow += currentDepth < pcfDepth ? 1.0 : 0.0;
+        }
+    }
+    return shadow / 9.0;
+}
+
+// ---------------------------------------------------------------------------
 // Fresnel helpers
 // ---------------------------------------------------------------------------
 
@@ -260,8 +316,10 @@ fragment float4 oceanFragment(
     texture2d<float>          normalMap   [[texture(0)]],
     texturecube<float>        envMap      [[texture(1)]],
     texture2d<float>          reflTex     [[texture(2)]],
+    depth2d<float>            shadowMap   [[texture(3)]],
     sampler                   repeatSamp  [[sampler(0)]],
-    sampler                   clampSamp   [[sampler(1)]])
+    sampler                   clampSamp   [[sampler(1)]],
+    sampler                   shadowSamp  [[sampler(2)]])
 {
     float3x3 TBN = float3x3(normalize(in.tangent),
                              normalize(in.bitangent),
@@ -301,7 +359,8 @@ fragment float4 oceanFragment(
     float3 color     = mix(baseColor, deepColor, depthFade);
     color = pow(color, surface.gamma);
 
-    float3 diffuse = (1.0 - fresnel) * diff * color;
+    float  shadow  = shadowPCF(in.fragPos, normal, lightDir, shadowMap, shadowSamp, scene);
+    float3 diffuse = (1.0 - fresnel) * diff * shadow * color;
 
     // Caustics
     float causticStr = smoothstep(surface.causticTroughMin, surface.causticTroughMax,
