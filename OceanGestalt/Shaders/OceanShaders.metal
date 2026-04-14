@@ -400,18 +400,35 @@ struct OceanVertexData {
     float2        texCoord;
 };
 
+/// Subsampling parameters passed from OceanRenderer.encodeNormals().
+/// gridWidth = n+1 vertices per side; stride = sample every Nth row/col.
+/// Draw (samplesPerRow)^2 * 2 vertices (paired as .line segments).
+struct NormalsUniforms {
+    uint  gridWidth;
+    uint  stride;
+    float2 _pad;
+};
+
 struct NormalsVertOut {
     float4 clipPos [[position]];
     float3 color;
 };
 
 vertex NormalsVertOut normalsVertex(
-    uint                      vertexID [[vertex_id]],
-    constant OceanVertexData* vertices [[buffer(0)]],
-    constant SceneUniforms&   scene    [[buffer(1)]])
+    uint                        vertexID [[vertex_id]],
+    constant OceanVertexData*   vertices [[buffer(0)]],
+    constant SceneUniforms&     scene    [[buffer(1)]],
+    constant NormalsUniforms&   norm     [[buffer(2)]])
 {
-    uint  vi    = vertexID / 2;
-    bool  isTip = (vertexID & 1) == 1;
+    // Map the draw-vertex index to a 2D strided grid sample so that
+    // we draw one normal per (stride × stride) cell rather than per vertex.
+    uint samplesPerRow = (norm.gridWidth + norm.stride - 1) / norm.stride;
+    uint sampleIdx = vertexID / 2;
+    bool isTip     = (vertexID & 1) == 1;
+
+    uint row = (sampleIdx / samplesPerRow) * norm.stride;
+    uint col = (sampleIdx % samplesPerRow) * norm.stride;
+    uint vi  = row * norm.gridWidth + col;
 
     float3 base = float3(vertices[vi].position);
 

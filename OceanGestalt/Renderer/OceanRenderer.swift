@@ -310,9 +310,12 @@ final class OceanRenderer {
         if let enc = cmdBuf.makeRenderCommandEncoder(descriptor: rpd) {
             enc.label = "MainPass"
 
-            // Ocean solid (model matrix = identity, stored in SceneUniforms.modelMatrix)
-            encodeOcean(enc, scene: sceneU, surface: surfaceU,
-                        wireframe: false, time: time)
+            // Ocean solid — hidden when showMesh is false so the wireframe + normals
+            // can be inspected without the opaque surface covering them
+            if showMesh {
+                encodeOcean(enc, scene: sceneU, surface: surfaceU,
+                            wireframe: false, time: time)
+            }
 
             // Ocean wireframe (model matrix shifted -0.2 Y to sit just below the surface)
             var wireSceneU = sceneU
@@ -387,15 +390,30 @@ final class OceanRenderer {
                                   indexBuffer: buf, indexBufferOffset: 0)
     }
 
+    // Mirrors the NormalsUniforms struct in OceanShaders.metal (must stay in sync).
+    private struct NormalsUniforms {
+        var gridWidth: UInt32
+        var stride:    UInt32
+        var _pad:      SIMD2<Float> = .zero
+    }
+
     private func encodeNormals(_ enc: MTLRenderCommandEncoder,
                                 scene: SceneUniforms) {
+        // Sample every 8th vertex in both row and column directions.
+        // For a 121-vertex-wide grid: (121+7)/8 = 16 samples per side → 256 lines.
+        let stride: UInt32    = 8
+        let gw: UInt32        = UInt32(oceanMesh.gridWidth)
+        let samplesPerRow     = (gw + stride - 1) / stride
+        var normUni           = NormalsUniforms(gridWidth: gw, stride: stride)
+        let sampleCount       = Int(samplesPerRow) * Int(samplesPerRow)
+
         enc.setRenderPipelineState(normalsPipeline)
         enc.setDepthStencilState(solidDepthState)
         enc.setVertexBuffer(oceanMesh.vertexBuffer, offset: 0, index: 0)
         var scn = scene
-        enc.setVertexBytes(&scn, length: MemoryLayout<SceneUniforms>.size, index: 1)
-        enc.drawPrimitives(type: .line, vertexStart: 0,
-                           vertexCount: oceanMesh.vertexCount * 2)
+        enc.setVertexBytes(&scn,     length: MemoryLayout<SceneUniforms>.size,   index: 1)
+        enc.setVertexBytes(&normUni, length: MemoryLayout<NormalsUniforms>.size, index: 2)
+        enc.drawPrimitives(type: .line, vertexStart: 0, vertexCount: sampleCount * 2)
     }
 
     // MARK: - Texture loading

@@ -25,6 +25,7 @@ struct OceanMeshBuffers {
     let indexBuffer:   MTLBuffer
     let indexCount:    Int
     let vertexCount:   Int
+    let gridWidth:     Int   // n+1 vertices per side of the square grid
     /// Horizontal + vertical grid lines for the wireframe pass.
     let wirelineBuffer: MTLBuffer
     let wirelineCount:  Int
@@ -97,6 +98,7 @@ enum MeshBuilder {
         return OceanMeshBuffers(vertexBuffer: vb, indexBuffer: ib,
                                 indexCount: tris.count,
                                 vertexCount: verts.count,
+                                gridWidth: n + 1,
                                 wirelineBuffer: wb, wirelineCount: lines.count)
     }
 
