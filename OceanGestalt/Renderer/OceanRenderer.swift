@@ -123,10 +123,14 @@ final class OceanRenderer {
         let yaw = atan2(camera.forward.x, camera.forward.z)
         audio?.generateSurf(waves: uniforms.waves, position: camera.position, yaw: yaw, time: time)
 
-        // Camera wave floating
-        let cameraXZ  = SIMD2<Float>(camera.position.x, camera.position.z)
+        // Camera wave floating: apply full 3D wave displacement to position so the
+        // camera rides the wave in all axes. viewMatrix is computed from position so
+        // the look direction (camera.forward) is unchanged — only the eye moves.
+        // Mirrors Camera::getViewMatrix in the C++ reference.
+        let cameraXZ   = SIMD2<Float>(camera.position.x, camera.position.z)
+        let waveDisp   = gerstnerOffset(xz: cameraXZ, time: time)
         var floatingCamera = camera
-        floatingCamera.position.y = camera.position.y + gerstnerOffset(xz: cameraXZ, time: time).y
+        floatingCamera.position = camera.position + waveDisp
 
         let size   = view.drawableSize
         let aspect = Float(size.width / size.height)
