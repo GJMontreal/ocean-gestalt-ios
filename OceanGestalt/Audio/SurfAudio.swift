@@ -4,26 +4,44 @@ import simd
 /// Procedural stereo surf audio. Matches SurfAudio.cpp — bandpass-filtered
 /// white noise driven by Gerstner wave steepness sampled at two points
 /// flanking the camera (L and R, ~5 units apart along the camera's right axis).
+/// A second sizzle layer adds high-frequency (~4.5 kHz) bandpass noise with
+/// fast amplitude modulation, giving the hissing crackle of spray on water.
 ///
 /// Uses AVAudioEngine with a custom source node so all DSP runs on the
 /// audio thread. State is shared via atomics.
 @MainActor
 final class SurfAudio {
 
-    private static let sampleRate: Double    = 44100
+    private static let sampleRate: Double      = 44100
     private static let horizontalOffset: Float = 10
-    private static let gain: Float           = 1.0
+    private static let surfGain:   Float       = 0.4
+    private static let sizzleGain: Float       = 0.35
 
     // Steepness values written on main thread, read on audio thread
-    private var steepnessLeft:  Float = 0  // protected by _steepness atomic via sendable wrapper
+    private var steepnessLeft:  Float = 0
     private var steepnessRight: Float = 0
     private let steepnessLock = NSLock()
 
     private let engine     = AVAudioEngine()
     private var sourceNode: AVAudioSourceNode!
 
+    // Surf layer — low-mid bandpass rumble
     private var leftFilter  = BandpassFilter(sampleRate: sampleRate, frequency: 600,  q: 0.7)
     private var rightFilter = BandpassFilter(sampleRate: sampleRate, frequency: 1200, q: 1.0)
+
+    // Sizzle layer — high bandpass noise with fast AM modulation
+    private var sizzleFilterL = BandpassFilter(sampleRate: sampleRate, frequency: 4500, q: 1.5)
+    private var sizzleFilterR = BandpassFilter(sampleRate: sampleRate, frequency: 5200, q: 1.5)
+    // AM envelope: first-order lowpass on random values, updated each sample.
+    // Cutoff ~60 Hz gives the characteristic crackle rate of sizzling spray.
+    private var sizzleEnvL: Float = 0
+    private var sizzleEnvR: Float = 0
+    private static let sizzleEnvCoeff: Float = {
+        // One-pole lowpass coefficient for ~60 Hz cutoff at 44100 Hz
+        let rc = 1.0 / (2.0 * Float.pi * 60.0)
+        let dt = 1.0 / Float(SurfAudio.sampleRate)
+        return dt / (rc + dt)
+    }()
 
     private var isStarted = false
 
@@ -41,11 +59,22 @@ final class SurfAudio {
             let l = blf[0].mData!.assumingMemoryBound(to: Float.self)
             let r = blf[1].mData!.assumingMemoryBound(to: Float.self)
 
+            let c = SurfAudio.sizzleEnvCoeff
             for i in 0..<Int(frameCount) {
                 let noiseL = Float.random(in: -1...1)
                 let noiseR = Float.random(in: -1...1)
-                l[i] = self.leftFilter.process(noiseL)  * left
-                r[i] = self.rightFilter.process(noiseR) * right
+
+                // Surf layer
+                l[i] = self.leftFilter.process(noiseL)  * left  * SurfAudio.surfGain
+                r[i] = self.rightFilter.process(noiseR) * right * SurfAudio.surfGain
+
+                // Sizzle layer — bandpass noise × lowpass-smoothed random envelope
+                self.sizzleEnvL += c * (abs(Float.random(in: -1...1)) - self.sizzleEnvL)
+                self.sizzleEnvR += c * (abs(Float.random(in: -1...1)) - self.sizzleEnvR)
+                let sizzleL = self.sizzleFilterL.process(noiseL) * self.sizzleEnvL
+                let sizzleR = self.sizzleFilterR.process(noiseR) * self.sizzleEnvR
+                l[i] += sizzleL * left  * SurfAudio.sizzleGain
+                r[i] += sizzleR * right * SurfAudio.sizzleGain
             }
             return noErr
         }
@@ -84,7 +113,7 @@ final class SurfAudio {
                                               yaw: yaw)
         let ls = steepness(waves: waves, xz: leftXZ,  time: time)
         let rs = steepness(waves: waves, xz: rightXZ, time: time)
-        setSteepness(left: ls * SurfAudio.gain, right: rs * SurfAudio.gain)
+        setSteepness(left: ls, right: rs)
     }
 
     // MARK: - Private
