@@ -8,6 +8,8 @@ import GestureCameraMetalKit
 struct ContentView: View {
     @StateObject private var engine = OceanEngine()
     @State private var lastDragLocation: CGPoint = .zero
+    @State private var showControls = true
+    @State private var hideTask: Task<Void, Never>? = nil
 
     var body: some View {
         if let camera = engine.camera {
@@ -16,48 +18,83 @@ struct ContentView: View {
                 MetalView(engine: engine)
                     .ignoresSafeArea()
 
-                // 2 — Single-finger drag → camera rotation
-                //     Sits below WASDOverlayView so WASD button touches
-                //     are handled by SwiftUI before reaching this layer.
+                // 2 — Single-finger drag → camera rotation.
+                //     minimumDistance: 0 so a bare tap also calls touchDetected().
+                //     Rotation is only applied when the delta is meaningful.
                 Rectangle()
                     .fill(.clear)
                     .contentShape(Rectangle())
                     .gesture(
-                        DragGesture(minimumDistance: 1)
+                        DragGesture(minimumDistance: 0)
                             .onChanged { value in
+                                touchDetected()
                                 let prev = lastDragLocation == .zero
                                          ? value.startLocation : lastDragLocation
                                 let dx = Float(value.location.x - prev.x)
                                 let dy = Float(value.location.y - prev.y)
                                 lastDragLocation = value.location
-                                camera.applyRotationGesture(dx: dx, dy: dy)
+                                if abs(dx) > 0.5 || abs(dy) > 0.5 {
+                                    camera.applyRotationGesture(dx: dx, dy: dy)
+                                }
                             }
                             .onEnded { _ in lastDragLocation = .zero }
                     )
                     .ignoresSafeArea()
 
-                // 3 — WASD d-pad + vertical + motion toggle (from GestureCamera)
+                // 3 — WASD d-pad + vertical + motion toggle (from GestureCamera).
+                //     simultaneousGesture resets the hide timer while the WASD
+                //     buttons are being used without disrupting their own gestures.
                 WASDOverlayView(controller: camera)
                     .ignoresSafeArea()
+                    .opacity(showControls ? 1 : 0)
+                    .allowsHitTesting(showControls)
+                    .simultaneousGesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { _ in touchDetected() }
+                    )
 
                 // 4 — Pause / mute: left side, same row as the motion toggle (20pt top)
                 HStack(spacing: 8) {
                     controlButton(
                         systemImage: engine.isRunning ? "pause.fill" : "play.fill",
-                        action: { engine.togglePause() }
+                        action: { touchDetected(); engine.togglePause() }
                     )
                     controlButton(
                         systemImage: engine.isMuted ? "speaker.slash.fill" : "speaker.fill",
-                        action: { engine.toggleMute() }
+                        action: { touchDetected(); engine.toggleMute() }
                     )
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .padding(.top, 20)
                 .padding(.leading, 20)
+                .opacity(showControls ? 1 : 0)
+                .allowsHitTesting(showControls)
             }
             .background(Color.black)
+            .onAppear { scheduleHide() }
         }
     }
+
+    // MARK: - Controls visibility
+
+    private func touchDetected() {
+        if !showControls {
+            withAnimation(.easeInOut(duration: 0.2)) { showControls = true }
+        }
+        scheduleHide()
+    }
+
+    private func scheduleHide() {
+        hideTask?.cancel()
+        hideTask = Task { @MainActor in
+            do {
+                try await Task.sleep(for: .seconds(3))
+                withAnimation(.easeInOut(duration: 0.5)) { showControls = false }
+            } catch {}
+        }
+    }
+
+    // MARK: - Control button style
 
     @ViewBuilder
     private func controlButton(systemImage: String, action: @escaping () -> Void) -> some View {
