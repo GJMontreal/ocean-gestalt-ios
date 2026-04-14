@@ -56,6 +56,7 @@ final class UniformState {
     var fresnelF0: Float               = 0.04
     var gamma: Float                   = 0.45
     var reflectionDistortion: Float    = 0.03
+    var reflectionStrength: Float      = 0.6
 
     // Gust
     var gustDirection: SIMD2<Float>    = SIMD2<Float>(1, 0)
@@ -154,6 +155,7 @@ final class UniformState {
         s.fresnelF0             = fresnelF0
         s.gamma                 = gamma
         s.reflectionDistortion  = reflectionDistortion
+        s.reflectionStrength    = reflectionStrength
         s.gustDirection         = gustDirection
         s.gustSpeed             = gustSpeed
         s.gustScale             = gustScale
@@ -256,6 +258,8 @@ final class UniformState {
             if let v = floatValue(rawValue) { gamma = v }
         case "mesh_shader.reflectionDistortion":
             if let v = floatValue(rawValue) { reflectionDistortion = v }
+        case "mesh_shader.reflectionStrength":
+            if let v = floatValue(rawValue) { reflectionStrength = v }
         case "mesh_shader.gust.direction":
             if let arr = rawValue as? [Double], arr.count >= 2 {
                 gustDirection = SIMD2<Float>(Float(arr[0]), Float(arr[1]))

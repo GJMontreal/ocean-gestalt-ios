@@ -94,8 +94,8 @@ typedef struct {
     float       gustSpeed;          //                    offset 168
     float       gustScale;          //                    offset 172
     float       gustStrength;       //                    offset 176
-    float       _padGust0;
-    float       _padGust1;
+    float       reflectionStrength; //                    offset 180
+    float       _padGust1;          //                    offset 184
     float       _padGust2;          //                    offset 188 → 192
 
     // Normal mapping

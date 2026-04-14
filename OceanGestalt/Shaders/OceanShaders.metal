@@ -63,7 +63,8 @@ struct SurfaceUniforms {
     float   gustSpeed;
     float   gustScale;
     float   gustStrength;
-    float   _padGust0, _padGust1, _padGust2;
+    float   reflectionStrength;
+    float   _padGust1, _padGust2;
     float   normalMappingScale;
     float   normalMappingSpeed;
     float2  normalMappingDir;
@@ -275,7 +276,9 @@ fragment float4 oceanFragment(
 
     // Planar reflection — project frag pos into reflection UV
     float4 clipRefl = scene.reflectionMatrix * float4(in.fragPos, 1.0);
-    float2 reflUV   = (clipRefl.xy / clipRefl.w) * 0.5 + 0.5;
+    // Metal textures have v=0 at the top; OpenGL has v=0 at the bottom.
+    // Negate y so that NDC +1 (top of screen) maps to v=0 (top of texture).
+    float2 reflUV   = (clipRefl.xy / clipRefl.w) * float2(0.5, -0.5) + 0.5;
     reflUV += float2(normal.x, normal.z) * surface.reflectionDistortion;
     reflUV  = clamp(reflUV, 0.001, 0.999);
     float3 planarRefl = reflTex.sample(clampSamp, reflUV).rgb;
@@ -284,7 +287,7 @@ fragment float4 oceanFragment(
     float  planarWeight   = 1.0 - cosTheta;
     float3 combinedRefl   = mix(envRefl, planarRefl, planarWeight);
     float3 fresnel        = fresnelSchlick(cosTheta, surface.fresnelF0);
-    float3 reflection     = fresnel * combinedRefl;
+    float3 reflection     = fresnel * combinedRefl * surface.reflectionStrength;
 
     // Depth-based colour
     float  depth     = length(scene.cameraPos.xyz - in.fragPos);
