@@ -4,8 +4,8 @@ import simd
 import GestureCamera
 
 // ---------------------------------------------------------------------------
-// Renderer — draws scene.json props (GltfModel) with no ocean/skybox/reflections.
-// Env map is deferred; nil is passed to GltfModel for now.
+// Renderer — draws scene.json props (ModelDrawable) with no ocean/skybox/reflections.
+// Env map is deferred; nil is passed to ModelDrawable for now.
 // ---------------------------------------------------------------------------
 
 @MainActor
@@ -102,7 +102,7 @@ final class OceanRenderer {
                 withExtension: (config.file as NSString).pathExtension,
                 subdirectory: "data/models")
             else { throw RendererError.assetNotFound(config.file) }
-            return try GltfModel(
+            return try ModelDrawable(
                 device: dev, url: url, config: config,
                 library: library,
                 colorPixelFormat: colorFmt,

@@ -45,7 +45,7 @@ struct ModelUniforms {
 };
 
 // ---------------------------------------------------------------------------
-// Vertex layout — packed to match GltfVertex in GltfModel.swift
+// Vertex layout — packed to match ModelDrawable.mtlVertexDescriptor
 // position: float3 (12), texCoord: float2 (8), normal: float3 (12),
 // tangent: float4 (16) — stride 48
 // ---------------------------------------------------------------------------

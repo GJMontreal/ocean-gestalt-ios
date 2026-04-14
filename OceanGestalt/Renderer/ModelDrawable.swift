@@ -3,11 +3,12 @@ import MetalKit
 import ModelIO
 import simd
 
-/// Drawable backed by a GLTF/GLB file. Loads via ModelIO, uploads to Metal
-/// buffers, and performs the two-pass waterline draw (solid above / wireframe
-/// below) matching the C++ normal_bump.frag / GltfModel.cpp behaviour.
+/// Drawable backed by a ModelIO-supported asset (USDZ, OBJ, etc.). Loads via
+/// ModelIO, uploads to Metal buffers, and performs the two-pass waterline draw
+/// (solid above / wireframe below) matching the C++ normal_bump.frag /
+/// GltfModel.cpp behaviour.
 //@MainActor
-final class GltfModel: @MainActor Drawable {
+final class ModelDrawable: @MainActor Drawable {
 
     // MARK: - Types
 
@@ -56,7 +57,7 @@ final class GltfModel: @MainActor Drawable {
     // MARK: - Vertex descriptor (shared between MDL and MTL)
 
     /// Interleaved: position(float3,12) + texCoord(float2,8) + normal(float3,12) + tangent(float4,16) = 48 bytes
-    static let mtlVertexDescriptor: MTLVertexDescriptor = {
+    nonisolated(unsafe) static let mtlVertexDescriptor: MTLVertexDescriptor = {
         let d = MTLVertexDescriptor()
         d.attributes[0].format = .float3; d.attributes[0].offset = 0;  d.attributes[0].bufferIndex = 0
         d.attributes[1].format = .float2; d.attributes[1].offset = 12; d.attributes[1].bufferIndex = 0
@@ -98,7 +99,7 @@ final class GltfModel: @MainActor Drawable {
         let pipeDesc = MTLRenderPipelineDescriptor()
         pipeDesc.vertexFunction   = library.makeFunction(name: "modelVertex")
         pipeDesc.fragmentFunction = library.makeFunction(name: "modelFragment")
-        pipeDesc.vertexDescriptor = GltfModel.mtlVertexDescriptor
+        pipeDesc.vertexDescriptor = ModelDrawable.mtlVertexDescriptor
         pipeDesc.colorAttachments[0].pixelFormat = colorPixelFormat
         pipeDesc.depthAttachmentPixelFormat      = depthPixelFormat
         mainPipeline = try device.makeRenderPipelineState(descriptor: pipeDesc)
@@ -110,7 +111,7 @@ final class GltfModel: @MainActor Drawable {
         depthDesc.depthCompareFunction = .less
         depthDesc.isDepthWriteEnabled  = true
         guard let ds = device.makeDepthStencilState(descriptor: depthDesc) else {
-            throw GltfModelError.initFailed("depth state")
+            throw ModelDrawableError.initFailed("depth state")
         }
         depthState = ds
 
@@ -118,7 +119,7 @@ final class GltfModel: @MainActor Drawable {
         wireDepthDesc.depthCompareFunction = .less
         wireDepthDesc.isDepthWriteEnabled  = false
         guard let wds = device.makeDepthStencilState(descriptor: wireDepthDesc) else {
-            throw GltfModelError.initFailed("wire depth state")
+            throw ModelDrawableError.initFailed("wire depth state")
         }
         wireDepthState = wds
 
@@ -130,25 +131,24 @@ final class GltfModel: @MainActor Drawable {
         sampDesc.magFilter    = .linear
         sampDesc.mipFilter    = .linear
         guard let samp = device.makeSamplerState(descriptor: sampDesc) else {
-            throw GltfModelError.initFailed("sampler")
+            throw ModelDrawableError.initFailed("sampler")
         }
         sampler = samp
 
-        print("canImport glb %b", MDLAsset.canImportFileExtension("glb"))
-        // ---- Load GLB ----
+        // ---- Load asset ----
         let bufferAllocator = MTKMeshBufferAllocator(device: device)
         let asset = MDLAsset(url: url,
-                             vertexDescriptor: GltfModel.mdlVertexDescriptor(),
+                             vertexDescriptor: ModelDrawable.mdlVertexDescriptor(),
                              bufferAllocator: bufferAllocator)
         asset.loadTextures()
 
         let (mdlMeshes, mtkMeshes) = try MTKMesh.newMeshes(asset: asset, device: device)
 
-        // ---- Fallback 1×1 textures (used when a GLB has no embedded texture) ----
+        // ---- Fallback 1×1 textures (used when the asset has no embedded texture) ----
         // Flat normal (0.5,0.5,1.0) → decodes to tangent-space (0,0,1); white albedo; mid roughness.
-        let fbColor  = GltfModel.make1x1(device: device, rgba: (255, 255, 255, 255))
-        let fbNormal = GltfModel.make1x1(device: device, rgba: (127, 127, 255, 255))
-        let fbMR     = GltfModel.make1x1(device: device, rgba: (0,   128,   0, 255))
+        let fbColor  = ModelDrawable.make1x1(device: device, rgba: (255, 255, 255, 255))
+        let fbNormal = ModelDrawable.make1x1(device: device, rgba: (127, 127, 255, 255))
+        let fbMR     = ModelDrawable.make1x1(device: device, rgba: (0,   128,   0, 255))
 
         // ---- Materials ----
         let textureLoader = MTKTextureLoader(device: device)
@@ -158,18 +158,19 @@ final class GltfModel: @MainActor Drawable {
             for (mdlSubmesh, _) in zip(mdlMesh.submeshes as! [MDLSubmesh], mtkMesh.submeshes) {
                 var mat = Material()
                 if let mdlMat = mdlSubmesh.material {
-                    mat.colorTex  = GltfModel.loadTexture(from: mdlMat, semantic: .baseColor,
-                                                          loader: textureLoader, sRGB: true)
-                    mat.normalTex = GltfModel.loadTexture(from: mdlMat, semantic: .tangentSpaceNormal,
-                                                          loader: textureLoader, sRGB: false)
-                    mat.mrTex     = GltfModel.loadTexture(from: mdlMat, semantic: .roughness,
-                                                          loader: textureLoader, sRGB: false)
+                    mat.colorTex  = ModelDrawable.loadTexture(from: mdlMat, semantic: .baseColor,
+                                                              device: device, loader: textureLoader, sRGB: true)
+                    mat.normalTex = ModelDrawable.loadTexture(from: mdlMat, semantic: .tangentSpaceNormal,
+                                                              device: device, loader: textureLoader, sRGB: false)
+                    mat.mrTex     = ModelDrawable.loadTexture(from: mdlMat, semantic: .roughness,
+                                                              device: device, loader: textureLoader, sRGB: false)
                 }
                 // Fall back to 1×1 defaults so the shader never samples an unbound slot
                 mat.colorTex  = mat.colorTex  ?? fbColor
                 mat.normalTex = mat.normalTex ?? fbNormal
                 mat.mrTex     = mat.mrTex     ?? fbMR
-                print("[GltfModel] \(config.name) submesh — color:\(mat.colorTex != nil) normal:\(mat.normalTex != nil) mr:\(mat.mrTex != nil)")
+                let colorPropType: Int = mdlSubmesh.material?.property(with: MDLMaterialSemantic.baseColor).map { Int($0.type.rawValue) } ?? -1
+                print("[ModelDrawable] \(config.name) submesh — color:\(mat.colorTex != nil) normal:\(mat.normalTex != nil) mr:\(mat.mrTex != nil) (colorPropType:\(colorPropType))")
                 loadedMaterials.append(mat)
             }
         }
@@ -180,7 +181,7 @@ final class GltfModel: @MainActor Drawable {
         for mtkMesh in mtkMeshes {
             guard let vtxBuf = mtkMesh.vertexBuffers.first?.buffer else { continue }
             for submesh in mtkMesh.submeshes {
-                let edges = GltfModel.buildEdgeBuffer(
+                let edges = ModelDrawable.buildEdgeBuffer(
                     indexBuffer: submesh.indexBuffer.buffer,
                     indexCount: submesh.indexCount,
                     device: device
@@ -199,7 +200,7 @@ final class GltfModel: @MainActor Drawable {
 
         primitives = loadedPrimitives
         materials  = loadedMaterials
-        print("[GltfModel] \(config.name) — \(loadedPrimitives.count) primitives, \(loadedMaterials.count) materials")
+        print("[ModelDrawable] \(config.name) — \(loadedPrimitives.count) primitives, \(loadedMaterials.count) materials")
 
         // ---- Per-model config overrides ----
         if let w = config.waterlineWidth { waterlineWidth = w }
@@ -216,7 +217,7 @@ final class GltfModel: @MainActor Drawable {
         encodePasses(into: encoder, modelMatrix: modelMatrix, scene: scene,
                      isReflection: false)
     }
-    
+
     nonisolated func encodeReflection(
         into encoder: MTLRenderCommandEncoder,
         modelMatrix: simd_float4x4,
@@ -303,23 +304,55 @@ final class GltfModel: @MainActor Drawable {
 
     // MARK: - Helpers
 
-    /// Loads a texture from an MDLMaterial property; returns nil on failure
-    /// (the shader handles nil textures via fallback behaviour in the pipeline).
+    /// Loads a texture from an MDLMaterial property; returns nil on failure.
+    ///
+    /// Handles the delivery styles ModelIO uses depending on asset format:
+    ///  • `.texture`            — resolved MDLTexture object (GLB/embedded)
+    ///  • `.string` / `.URL`   — file-path reference (USDZ)
+    ///  • `.float3` / `.float4` / `.color` — solid-colour value; minted as a 1×1 texture
     private static func loadTexture(
         from material: MDLMaterial,
         semantic: MDLMaterialSemantic,
+        device: MTLDevice,
         loader: MTKTextureLoader,
         sRGB: Bool
     ) -> MTLTexture? {
-        guard let prop = material.property(with: semantic),
-              prop.type == .texture,
-              let mdlTex = prop.textureSamplerValue?.texture
-        else { return nil }
+        guard let prop = material.property(with: semantic) else { return nil }
         let opts: [MTKTextureLoader.Option: Any] = [
             .generateMipmaps: true,
             .SRGB: sRGB
         ]
-        return try? loader.newTexture(texture: mdlTex, options: opts)
+        switch prop.type {
+        case .texture:
+            guard let mdlTex = prop.textureSamplerValue?.texture else { return nil }
+            return try? loader.newTexture(texture: mdlTex, options: opts)
+        case .string:
+            guard let path = prop.stringValue,
+                  let url = URL(string: path) ?? URL(string: "file://" + path)
+            else { return nil }
+            return try? loader.newTexture(URL: url, options: opts)
+        case .URL:
+            guard let url = prop.urlValue else { return nil }
+            return try? loader.newTexture(URL: url, options: opts)
+        case .float3:
+            let c = prop.float3Value
+            return make1x1(device: device, rgba: (toU8(c.x), toU8(c.y), toU8(c.z), 255))
+        case .float4:
+            let c = prop.float4Value
+            return make1x1(device: device, rgba: (toU8(c.x), toU8(c.y), toU8(c.z), toU8(c.w)))
+        case .color:
+            guard let cgColor = prop.color,
+                  let rgb = cgColor.converted(to: CGColorSpace(name: CGColorSpace.sRGB)!, intent: .defaultIntent, options: nil),
+                  let comps = rgb.components, rgb.numberOfComponents >= 3
+            else { return nil }
+            return make1x1(device: device, rgba: (toU8(Float(comps[0])), toU8(Float(comps[1])), toU8(Float(comps[2])), comps.count >= 4 ? toU8(Float(comps[3])) : 255))
+        default:
+            return nil
+        }
+    }
+
+    private static func toU8(_ v: Float) -> UInt8 {
+        UInt8(max(0, min(1, v)) * 255)
     }
 
     /// Builds a deduplicated edge (line) index buffer from a triangle index buffer.
@@ -355,7 +388,7 @@ final class GltfModel: @MainActor Drawable {
     }
 
     /// Creates a 1×1 RGBA8 texture with the given byte values.
-    /// Used as a fallback when a GLB has no embedded texture for a given semantic.
+    /// Used as a fallback when an asset has no embedded texture for a given semantic.
     private static func make1x1(device: MTLDevice,
                                 rgba: (UInt8, UInt8, UInt8, UInt8)) -> MTLTexture? {
         let desc = MTLTextureDescriptor.texture2DDescriptor(
@@ -373,7 +406,7 @@ final class GltfModel: @MainActor Drawable {
 
 // MARK: - Errors
 
-enum GltfModelError: Error {
+enum ModelDrawableError: Error {
     case initFailed(String)
     case loadFailed(String)
 }

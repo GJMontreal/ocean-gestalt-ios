@@ -4,8 +4,7 @@ import simd
 /// A unit cube at origin rendered via the Drawable protocol.
 /// Uses the same SceneUniforms + modelMatrix binding convention as GltfModel,
 /// so it exercises the full scene encode path.
-@MainActor
-final class CubeDrawable: Drawable {
+final class CubeDrawable: @MainActor Drawable {
 
     private let pipeline:   MTLRenderPipelineState
     private let depthState: MTLDepthStencilState

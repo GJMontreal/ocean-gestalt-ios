@@ -71,7 +71,7 @@ struct SurfaceUniforms {
 
 // ---------------------------------------------------------------------------
 // Debug cube — unit cube at origin.
-// Uses the same buffer bindings as GltfModel: SceneUniforms at 1, model matrix at 2.
+// Uses the same buffer bindings as ModelDrawable: SceneUniforms at 1, model matrix at 2.
 // ---------------------------------------------------------------------------
 
 struct CubeVertOut {
