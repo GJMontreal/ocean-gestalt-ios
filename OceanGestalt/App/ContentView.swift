@@ -48,7 +48,6 @@ struct ContentView: View {
                 //     simultaneousGesture resets the hide timer while the WASD
                 //     buttons are being used without disrupting their own gestures.
                 WASDOverlayView(controller: camera)
-                    .ignoresSafeArea()
                     .opacity(showControls ? 1 : 0)
                     .allowsHitTesting(showControls)
                     .simultaneousGesture(
