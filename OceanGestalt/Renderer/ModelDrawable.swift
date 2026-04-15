@@ -291,8 +291,12 @@ final class ModelDrawable: @MainActor Drawable {
             encoder.setFragmentSamplerState(sampler, index: 0)
 
             if isReflection {
-                // Reflection pass: single solid draw, no clip
-                var mu = makeModelUniforms(clip: 0)
+                // Reflection pass: clip below waterline so only above-water
+                // geometry renders. Without this, the submerged hull is also
+                // drawn from the reflected camera and projects back onto the
+                // water surface at the wrong position, creating a phantom
+                // reflection on the opposite side of the prop.
+                var mu = makeModelUniforms(clip: 1)
                 encoder.setFragmentBytes(&mu, length: MemoryLayout<ModelUniforms>.size, index: 3)
                 encoder.setDepthStencilState(depthState)
                 encoder.drawIndexedPrimitives(type: .triangle,

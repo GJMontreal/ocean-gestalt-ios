@@ -221,6 +221,8 @@ final class OceanRenderer {
             oceanPass.encode(into: enc, scene: sceneU, surface: surfaceU,
                              showMesh: showMesh, showNormals: showNormals, time: time)
 
+            skyboxPass.encode(into: enc, scene: sceneU)
+            
             if showMesh {
                 scene.encode(into: enc, time: time, waveOffset: waveOff,
                              scene: sceneU, surface: surfaceU)
